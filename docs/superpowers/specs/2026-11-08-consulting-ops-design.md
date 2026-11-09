@@ -131,6 +131,7 @@ Snapshots: on issue, the client billing details and firm header are copied onto 
 7. **Manual lines:** a draft may also have manual lines (description, quantity, unit price; amount = round(quantity × unit price, 2)) for fixed fees or rebilled costs. They are not linked to timesheets and survive regenerating the hours lines.
 8. **Daily detail page:** a template option adds a second PDF page listing each invoiced entry (date, consultant, project, hours, task note).
 9. **Templates:** a firm keeps several named templates; exactly one is the default; each firm starts with a default "Standard" template (classic layout).
+10. **Discount:** a draft may carry one invoice-level discount, either a percentage (0-100) or a fixed amount, with an optional label. It is taken off the subtotal before tax: discount = round(subtotal x percent / 100, 2) or the fixed amount (never more than the subtotal); tax = round((subtotal - discount) x tax percent / 100, 2); total = subtotal - discount + tax. It appears as its own row in the totals.
 
 ### 5.3 Payment reconciliation (manual)
 1. From an invoice or the Unpaid Invoices list, Manager records a payment and attaches one or more files.
