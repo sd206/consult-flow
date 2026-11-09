@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { requireFirmRole } from '@/lib/auth/context'
 import { getFirm } from '@/modules/firms/data'
 import { LogoForm, SettingsForm } from './settings-forms'
@@ -10,6 +11,11 @@ export default async function SettingsPage({ params }: { params: Promise<{ firmI
   return (
     <div className="max-w-2xl">
       <h1 className="text-2xl font-semibold">Settings</h1>
+      <p className="mt-2 text-sm">
+        <Link href={`/f/${firmId}/settings/templates`} className="underline underline-offset-4">
+          Invoice templates
+        </Link>
+      </p>
       {!firm.ok ? (
         <p role="alert" className="mt-4 text-sm text-destructive">
           {firm.error}
