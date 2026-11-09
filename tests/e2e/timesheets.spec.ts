@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test'
 import { addDays, currentWeekStart, formatDayLabel } from '../../src/lib/domain/weeks'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
-import { seedTimesheetFixture } from '../integration/timesheet-fixtures'
+import { PAST_WEEK, seedTimesheetFixture } from '../integration/timesheet-fixtures'
 
 async function login(page: Page, email: string, password = TEST_PASSWORD) {
   await page.goto('/login')
@@ -17,8 +17,7 @@ async function seed(f: Awaited<ReturnType<typeof newFirm>>, opts: Parameters<typ
   return s
 }
 
-const hours = (page: Page, day: string) =>
-  page.getByLabel(`Hours Portal ${formatDayLabel(day)}`, { exact: true })
+const hours = (page: Page, day: string) => page.getByLabel(`Hours Portal ${formatDayLabel(day)}`, { exact: true })
 const note = (page: Page, day: string) => page.getByLabel(`Note Portal ${formatDayLabel(day)}`, { exact: true })
 
 test.describe('weekly timesheet grid', () => {
@@ -92,7 +91,9 @@ test.describe('weekly timesheet grid', () => {
     await login(page, f.manager.email)
     await page.goto(`/f/${f.firmId}`)
     await page.getByRole('link', { name: 'My timesheet' }).first().click()
-    await expect(page.getByText("Your login isn't linked to a consultant record yet. Ask an Admin to link it.")).toBeVisible()
+    await expect(
+      page.getByText("Your login isn't linked to a consultant record yet. Ask an Admin to link it."),
+    ).toBeVisible()
   })
 
   test("consultant can't open another's timesheet", async ({ page }) => {
@@ -132,11 +133,138 @@ test.describe('weekly timesheet grid', () => {
     })
     expect(error).toBeNull()
     // End the assignment after the entry exists, so Thursday is no longer an active day.
-    await db.from('project_assignments').update({ effective_to: addDays(mon, 2) }).eq('id', s.assignmentId)
+    await db
+      .from('project_assignments')
+      .update({ effective_to: addDays(mon, 2) })
+      .eq('id', s.assignmentId)
     await login(page, f.consultant.email)
     await page.goto(`/f/${f.firmId}/timesheet`)
-    await expect(page.getByText("Hours on days you're no longer assigned to will be removed when you save.")).toBeVisible()
+    await expect(
+      page.getByText("Hours on days you're no longer assigned to will be removed when you save."),
+    ).toBeVisible()
     await expect(hours(page, thu)).toBeDisabled()
     await expect(hours(page, thu)).toHaveValue('3.00')
+  })
+})
+
+test.describe('manager timesheet review', () => {
+  const mon = currentWeekStart()
+
+  async function submitWeek(
+    f: Awaited<ReturnType<typeof newFirm>>,
+    s: Awaited<ReturnType<typeof seed>>,
+    week: string,
+    day: string,
+    h = '8',
+  ) {
+    const entries = [{ projectId: s.projectId, workDate: day, hours: h, note: null }]
+    const save = await f.consultant.db.rpc('save_timesheet_week', {
+      p_firm: f.firmId,
+      p_consultant: s.consultantId,
+      p_week_start: week,
+      p_entries: entries,
+    })
+    expect(save.error).toBeNull()
+    const sub = await f.consultant.db.rpc('submit_timesheet', { p_timesheet: save.data as string })
+    expect(sub.error).toBeNull()
+    return save.data as string
+  }
+
+  test('manager rejects, consultant fixes, manager approves', async ({ browser }) => {
+    const f = await newFirm('Review Firm')
+    const s = await seed(f, { clientRate: '187.43', costRate: '91.27' })
+    await submitWeek(f, s, mon, mon)
+
+    const mPage = await (await browser.newContext()).newPage()
+    await login(mPage, f.manager.email)
+    await mPage.goto(`/f/${f.firmId}`)
+    await mPage.getByRole('link', { name: 'Timesheets' }).first().click()
+    const queue = mPage.getByRole('region', { name: 'Awaiting approval' })
+    const row = queue.getByRole('row', { name: /Con Sultant/ })
+    await expect(row).toBeVisible()
+    await row.getByRole('link').first().click()
+    await mPage.getByLabel('What needs to change?').fill('Split hours by task')
+    await mPage.getByRole('button', { name: 'Reject' }).click()
+    await expect(mPage.getByTestId('status')).toHaveText('Rejected')
+
+    const cPage = await (await browser.newContext()).newPage()
+    await login(cPage, f.consultant.email)
+    await cPage.goto(`/f/${f.firmId}`)
+    await cPage.getByRole('link', { name: 'My timesheet' }).first().click()
+    await expect(cPage.getByText('Changes requested:')).toBeVisible()
+    await expect(cPage.getByText('Split hours by task')).toBeVisible()
+    await expect(hours(cPage, mon)).toBeEditable()
+    await hours(cPage, mon).fill('7.5')
+    await cPage.getByRole('button', { name: 'Submit', exact: true }).click()
+    await expect(cPage.getByTestId('status')).toHaveText('Submitted')
+
+    await mPage.goto(`/f/${f.firmId}/timesheets`)
+    await mPage
+      .getByRole('region', { name: 'Awaiting approval' })
+      .getByRole('link', { name: /Con Sultant/ })
+      .click()
+    await mPage.getByRole('button', { name: 'Approve' }).click()
+    await expect(mPage.getByTestId('status')).toHaveText('Approved')
+    await expect(mPage.getByText('187.43')).toBeVisible()
+    await expect(mPage.getByText('91.27')).toBeVisible()
+
+    await mPage.goto(`/f/${f.firmId}/timesheets`)
+    const wk = mPage.getByRole('region', { name: 'Week status' })
+    const wrow = wk.getByRole('row', { name: /Con Sultant/ })
+    await expect(wrow).toContainText('Approved')
+    await expect(wrow).toContainText('7.50')
+  })
+
+  test('cost rate missing shows a clear error', async ({ page }) => {
+    const f = await newFirm('Review Cost Firm')
+    const s = await seed(f, { costFrom: '2026-10-06' })
+    const id = await submitWeek(f, s, PAST_WEEK, PAST_WEEK)
+    await login(page, f.manager.email)
+    await page.goto(`/f/${f.firmId}/timesheets/${id}`)
+    await page.getByRole('button', { name: 'Approve' }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'no cost rate' })).toContainText(
+      'no cost rate for a day worked',
+    )
+    await expect(page.getByTestId('status')).toHaveText('Submitted')
+  })
+
+  test('reopen', async ({ page }) => {
+    const f = await newFirm('Review Reopen Firm')
+    const s = await seed(f)
+    const id = await submitWeek(f, s, mon, mon)
+    await login(page, f.manager.email)
+    await page.goto(`/f/${f.firmId}/timesheets/${id}`)
+    await page.getByRole('button', { name: 'Approve' }).click()
+    await expect(page.getByTestId('status')).toHaveText('Approved')
+    await page.getByRole('button', { name: 'Reopen' }).click()
+    await expect(page.getByTestId('status')).toHaveText('Draft')
+  })
+
+  test('week status shows not started', async ({ page }) => {
+    const f = await newFirm('Review Status Firm')
+    await seed(f)
+    const { error } = await adminDb()
+      .from('consultants')
+      .insert({
+        firm_id: f.firmId,
+        name: 'Newbie Nora',
+        email: `n-${crypto.randomUUID()}@test.local`,
+        type: 'employee',
+      })
+    expect(error).toBeNull()
+    await login(page, f.manager.email)
+    await page.goto(`/f/${f.firmId}/timesheets`)
+    const row = page.getByRole('region', { name: 'Week status' }).getByRole('row', { name: /Newbie Nora/ })
+    await expect(row).toContainText('Not started')
+    await row.getByRole('link', { name: 'Enter time' }).click()
+    await expect(page.getByRole('heading', { name: 'Timesheet: Newbie Nora' })).toBeVisible()
+  })
+
+  test('consultant gets 404 on /timesheets', async ({ page }) => {
+    const f = await newFirm('Review 404 Firm')
+    await seed(f)
+    await login(page, f.consultant.email)
+    const res = await page.goto(`/f/${f.firmId}/timesheets`)
+    expect(res?.status()).toBe(404)
   })
 })

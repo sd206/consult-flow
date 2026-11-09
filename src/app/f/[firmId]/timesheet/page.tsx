@@ -3,17 +3,11 @@ import { notFound, redirect } from 'next/navigation'
 import { requireFirmRole } from '@/lib/auth/context'
 import { isIsoDate } from '@/lib/domain/dates'
 import { addDays, currentWeekStart, formatDayLabel, isFutureWeek, weekStartOf } from '@/lib/domain/weeks'
-import { getMyConsultant, getTimesheetWeek, type WeekStatus } from '@/modules/timesheets/data'
+import { getMyConsultant, getTimesheetWeek } from '@/modules/timesheets/data'
+import { STATUS_LABEL } from './status-label'
 import { WeekGrid } from './week-grid'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const STATUS_LABEL: Record<WeekStatus, string> = {
-  not_started: 'Not started',
-  draft: 'Draft',
-  submitted: 'Submitted',
-  approved: 'Approved',
-  rejected: 'Rejected',
-}
 
 export default async function TimesheetPage({
   params,
