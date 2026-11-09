@@ -265,7 +265,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "change_client_rate":
+            "add_firm_member":
+{ Args: { "p_firm": string,"p_role": Database["public"]['Enums']["firm_role"],"p_user": string }; Returns: string
+                           },
+"change_client_rate":
 { Args: { "p_assignment": string,"p_from": string,"p_rate": number }; Returns: string
                            },
 "create_firm_with_admin":

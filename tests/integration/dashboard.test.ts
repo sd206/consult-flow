@@ -35,7 +35,7 @@ describe('getDashboardSummary', () => {
       client_rate: 100,
       effective_from: '2026-01-01',
     })
-    await a.from('firms').update({ logo_path: 'x/logo.png' }).eq('id', f.firmId)
+    await a.from('firms').update({ logo_path: `firms/${f.firmId}/logo/x.png` }).eq('id', f.firmId)
 
     const res = await getDashboardSummary(f.manager.db, f.firmId)
     expect(res).toEqual({
@@ -49,7 +49,7 @@ describe('getDashboardSummary', () => {
     const a = adminDb()
     const { data: c1 } = await a.from('clients').insert({ firm_id: f.firmId, name: 'Co' }).select('id').single()
     await a.from('projects').insert({ firm_id: f.firmId, client_id: c1!.id, name: 'P' })
-    await a.from('firms').update({ logo_path: 'x/logo.png' }).eq('id', f.firmId)
+    await a.from('firms').update({ logo_path: `firms/${f.firmId}/logo/x.png` }).eq('id', f.firmId)
     const res = await getDashboardSummary(f.consultant.db, f.firmId)
     expect(res).toMatchObject({
       ok: true,

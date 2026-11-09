@@ -31,6 +31,26 @@ describe('firm-files storage', () => {
     expect(dl.data).not.toBeNull()
   })
 
+  it('consultant cannot read non-logo firm files; manager and admin can', async () => {
+    const f = await newFirm()
+    const path = `firms/${f.firmId}/attachments/x.pdf`
+    const pdf = new Blob([new TextEncoder().encode('%PDF-1.4')], { type: 'application/pdf' })
+    expect((await f.manager.db.storage.from(BUCKET).upload(path, pdf)).error).toBeNull()
+
+    const denied = await f.consultant.db.storage.from(BUCKET).download(path)
+    expect(denied.error).not.toBeNull()
+    expect(denied.data).toBeNull()
+    const listed = await f.consultant.db.storage.from(BUCKET).list(`firms/${f.firmId}/attachments`)
+    expect((listed.data ?? []).map((o) => o.name)).not.toContain('x.pdf')
+    const signed = await f.consultant.db.storage.from(BUCKET).createSignedUrl(path, 60)
+    expect(signed.error).not.toBeNull()
+
+    const byManager = await f.manager.db.storage.from(BUCKET).download(path)
+    expect(byManager.error).toBeNull()
+    expect(byManager.data).not.toBeNull()
+    expect((await f.admin.db.storage.from(BUCKET).download(path)).error).toBeNull()
+  })
+
   it('manager cannot write logo path, but can write elsewhere in firm', async () => {
     const f = await newFirm()
     const logo = `firms/${f.firmId}/logo/m.png`
