@@ -59,3 +59,5 @@ export function parseTemplateOptions(json: unknown): TemplateOptions {
   }
   return out as TemplateOptions
 }
+
+export type TemplateInput = z.infer<typeof templateInputSchema>

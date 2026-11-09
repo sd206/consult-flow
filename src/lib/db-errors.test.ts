@@ -91,6 +91,8 @@ describe('mapDbError', () => {
     ["invoice_lines_quantity_chk", "Quantity must be more than 0."],
     ["invoice_lines_description_chk", "Enter a description."],
     ["DISCOUNT_TOO_LARGE", "The discount can't be more than the subtotal."],
+    ["TEMPLATE_NOT_FOUND", "Template not found."],
+    ["invoice_templates_one_default", "Only one template can be the default."],
     ["invoices_discount_chk", "A percentage discount must be between 0 and 100, and an amount can't be negative."],
   ]
 
