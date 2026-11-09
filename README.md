@@ -55,6 +55,14 @@ npm run test:e2e    # Playwright; needs local Supabase running
 - Rates are frozen on approval. An approved timesheet can be reopened while none of its hours are invoiced.
 - To let an Admin or Manager log their own time, link their login to a consultant record: an Admin opens Consultants, opens the consultant, and chooses "Invite to log in" (this links an existing member or invites the email).
 
+## Invoicing
+
+- **Templates (Admin):** Settings → Invoice templates. Choose a Classic, Modern or Compact layout, an accent colour, which columns to show, payment terms and footer text, and whether to add an hours detail page. One template is the default; each firm starts with "Standard".
+- **Building (Admin and Manager):** Invoices → New invoice. Pick the client, period and template. Approved, not-yet-invoiced hours are grouped into one line per consultant × project × rate, with task notes as the description. Untick consultants to leave them out. Add manual lines (description, quantity, unit price) for fees or rebilled costs. One optional discount (percentage or fixed amount) is taken off before tax; the tax percent defaults from firm settings.
+- **Issuing:** assigns the next number from the firm's pattern (tokens `{YYYY}`, `{YY}`, `{MM}`, `{SEQ:n}`; the sequence never resets or rewinds), freezes the firm and client details on the invoice, locks the hours so they cannot be invoiced twice or reopened, and stores a PDF in Storage (amounts shown with the currency code). If the PDF fails the invoice stays issued; use "Regenerate PDF". If hours changed since the draft was built, issuing asks you to regenerate the lines.
+- **Voiding:** an issued, unpaid invoice can be voided. Its hours return to the pool and its number is not reused. Drafts can be deleted.
+- Consultants never see invoices or rates.
+
 ## Hosted Supabase
 
 ### Platform owner
