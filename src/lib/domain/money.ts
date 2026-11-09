@@ -31,3 +31,10 @@ export function subtractMoney(a: string, b: string): string {
   const frac = (abs % HUNDRED).toString().padStart(2, '0')
   return `${neg ? '-' : ''}${(abs / HUNDRED).toString()}.${frac}`
 }
+
+/** Money with the ISO currency code (e.g. "USD 1,234.50"); PDFs can't draw every currency symbol. */
+export function formatMoneyCode(amount: string, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, currencyDisplay: 'code' })
+    .format(Number(amount))
+    .replace(/[\u00A0\u202F]/g, ' ')
+}

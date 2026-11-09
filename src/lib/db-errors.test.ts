@@ -74,6 +74,30 @@ describe('mapDbError', () => {
     expect(mapDbError({ code: 'P0001', message: `x ${needle} y` })).toBe(expected)
   })
 
+  const invoiceCases: [string, string][] = [
+    ["INVOICE_NOT_FOUND", "Invoice not found."],
+    ["INVOICE_STATE", "This invoice can't be changed in its current state."],
+    ["INVOICE_EMPTY", "Add at least one line before issuing."],
+    ["INVOICE_STALE", "Hours changed since this draft was built. Regenerate the lines, then issue."],
+    ["INVOICE_HAS_PAYMENTS", "This invoice has payments, so it can't be voided."],
+    ["LINE_NOT_MANUAL", "Only manual lines can be changed this way."],
+    ["TEMPLATE_IS_DEFAULT", "The default template can't be deleted. Make another template the default first."],
+    ["invoice_templates_firm_name_key", "That name is already in use."],
+    ["invoice_templates_accent_chk", "Use a colour like #1F2937."],
+    ["invoices_template_fk", "This template is used by invoices, so it can't be deleted."],
+    ["invoices_period_chk", "The period end must be on or after the period start."],
+    ["invoices_due_chk", "The due date must be on or after the issue date."],
+    ["invoices_tax_chk", "Tax must be between 0 and 100 percent."],
+    ["invoice_lines_quantity_chk", "Quantity must be more than 0."],
+    ["invoice_lines_description_chk", "Enter a description."],
+    ["DISCOUNT_TOO_LARGE", "The discount can't be more than the subtotal."],
+    ["invoices_discount_chk", "A percentage discount must be between 0 and 100, and an amount can't be negative."],
+  ]
+
+  it.each(invoiceCases)('invoice error %s', (needle, expected) => {
+    expect(mapDbError({ code: 'P0001', message: `x ${needle} y` })).toBe(expected)
+  })
+
   it('logs the raw error', () => {
     const err = { code: '99999', message: 'boom' }
     mapDbError(err)
