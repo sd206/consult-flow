@@ -538,6 +538,9 @@ isOneToOne: false
 "is_platform_owner":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
+"issue_invoice":
+{ Args: { "p_invoice": string }; Returns: string
+                           },
 "my_assignments":
 { Args: { "p_firm": string }; Returns: {
               "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string
@@ -572,6 +575,9 @@ isOneToOne: false
 "set_invoice_line_description":
 { Args: { "p_description": string,"p_line": string }; Returns: undefined
                            },
+"set_invoice_pdf":
+{ Args: { "p_invoice": string,"p_path": string }; Returns: undefined
+                           },
 "storage_firm_id":
 { Args: { "p_name": string }; Returns: string
                            },
@@ -598,6 +604,9 @@ isOneToOne: false
                            },
 "update_invoice_period":
 { Args: { "p_consultants": (string)[],"p_end": string,"p_invoice": string,"p_start": string }; Returns: undefined
+                           },
+"void_invoice":
+{ Args: { "p_invoice": string }; Returns: undefined
                            },
 "week_projects":
 { Args: { "p_consultant": string,"p_firm": string,"p_week_start": string }; Returns: {
