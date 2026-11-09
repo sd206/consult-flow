@@ -452,11 +452,85 @@ isOneToOne: false
 "create_firm_with_admin":
 { Args: { "p_admin": string,"p_name": string }; Returns: string
                            },
+"create_invoice_draft":
+{ Args: { "p_client": string,"p_consultants": (string)[],"p_end": string,"p_firm": string,"p_start": string,"p_template": string }; Returns: string
+                           },
+"delete_invoice_draft":
+{ Args: { "p_invoice": string }; Returns: undefined
+                           },
+"delete_manual_line":
+{ Args: { "p_line": string }; Returns: undefined
+                           },
 "format_invoice_number":
 { Args: { "p_issue": string,"p_pattern": string,"p_seq": number }; Returns: string
                            },
 "has_role":
 { Args: { "p_firm": string,"p_roles": (Database["public"]['Enums']["firm_role"])[] }; Returns: boolean
+                           },
+"invoice_candidates":
+{ Args: { "p_client": string,"p_end": string,"p_firm": string,"p_start": string }; Returns: {
+              "consultant_id": string,"consultant_name": string,"entry_count": number,"hours": string,"project_id": string,"project_name": string,"rate": string
+            }[]
+                           },
+"invoice_generate_time_lines":
+{ Args: { "p_consultants": (string)[],"p_invoice": string }; Returns: undefined
+                           },
+"invoice_lock_draft":
+{ Args: { "p_invoice": string }; Returns: {
+              "amount_paid": number,
+"bill_to_address": string | null,
+"bill_to_contact_name": string | null,
+"bill_to_email": string | null,
+"bill_to_name": string | null,
+"bill_to_phone": string | null,
+"client_id": string,
+"created_at": string,
+"created_by": string | null,
+"currency": string,
+"discount_amount": number,
+"discount_label": string | null,
+"discount_type": Database["public"]['Enums']["invoice_discount_type"],
+"discount_value": number,
+"due_date": string,
+"firm_id": string,
+"from_address": string | null,
+"from_contact_email": string | null,
+"from_contact_name": string | null,
+"from_contact_phone": string | null,
+"from_logo_path": string | null,
+"from_name": string | null,
+"id": string,
+"issue_date": string,
+"issued_at": string | null,
+"issued_by": string | null,
+"number": string | null,
+"pdf_path": string | null,
+"period_end": string,
+"period_start": string,
+"status": Database["public"]['Enums']["invoice_status"],
+"subject": string | null,
+"subtotal": number,
+"tax_amount": number,
+"tax_percent": number,
+"template_id": string,
+"total": number,
+"updated_at": string,
+"voided_at": string | null,
+"voided_by": string | null
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "invoices"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"invoice_recalc":
+{ Args: { "p_invoice": string }; Returns: undefined
+                           },
+"invoice_time_groups":
+{ Args: { "p_client": string,"p_consultants": (string)[],"p_end": string,"p_firm": string,"p_start": string }; Returns: {
+              "consultant_id": string,"consultant_name": string,"entry_count": number,"hours": number,"notes": string,"project_id": string,"project_name": string,"rate": number
+            }[]
                            },
 "is_member":
 { Args: { "p_firm": string }; Returns: boolean
@@ -474,17 +548,29 @@ isOneToOne: false
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
             }[]
                            },
+"regenerate_invoice_lines":
+{ Args: { "p_consultants": (string)[],"p_invoice": string }; Returns: undefined
+                           },
 "reject_timesheet":
 { Args: { "p_comment": string,"p_timesheet": string }; Returns: undefined
                            },
 "reopen_timesheet":
 { Args: { "p_timesheet": string }; Returns: undefined
                            },
+"save_manual_line":
+{ Args: { "p_description": string,"p_invoice": string,"p_line": string,"p_quantity": number,"p_unit_price": number }; Returns: string
+                           },
 "save_timesheet_week":
 { Args: { "p_consultant": string,"p_entries": Json,"p_firm": string,"p_week_start": string }; Returns: string
                            },
 "set_default_template":
 { Args: { "p_template": string }; Returns: undefined
+                           },
+"set_invoice_discount":
+{ Args: { "p_invoice": string,"p_label": string,"p_type": Database["public"]['Enums']["invoice_discount_type"],"p_value": number }; Returns: undefined
+                           },
+"set_invoice_line_description":
+{ Args: { "p_description": string,"p_line": string }; Returns: undefined
                            },
 "storage_firm_id":
 { Args: { "p_name": string }; Returns: string
@@ -506,6 +592,12 @@ isOneToOne: false
 { Args: { "p_firm": string,"p_ids": (string)[] }; Returns: {
               "timesheet_id": string,"total_hours": string
             }[]
+                           },
+"update_invoice_draft":
+{ Args: { "p_due_date": string,"p_invoice": string,"p_issue_date": string,"p_subject": string,"p_tax_percent": number,"p_template": string }; Returns: undefined
+                           },
+"update_invoice_period":
+{ Args: { "p_consultants": (string)[],"p_end": string,"p_invoice": string,"p_start": string }; Returns: undefined
                            },
 "week_projects":
 { Args: { "p_consultant": string,"p_firm": string,"p_week_start": string }; Returns: {

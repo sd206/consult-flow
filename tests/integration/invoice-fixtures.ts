@@ -21,6 +21,11 @@ async function insertOne<T>(table: string, row: Record<string, unknown>): Promis
  * assignment, then saves + submits (consultant) and approves (manager) one week.
  * `beforeApprove` runs after submit and before approve (rate snapshots are taken
  * on approval).
+ *
+ * Options for more than one consultant per firm: `clientId` + `projectId` reuse
+ * an existing client/project; `linkUser: false` creates a consultant with no
+ * login (the manager saves and submits for them); `approve: false` stops after
+ * submit.
  */
 export async function seedApprovedHours(
   f: Firm,
@@ -33,24 +38,34 @@ export async function seedApprovedHours(
     weekStart?: string
     entries: { workDate: string; hours: string; note?: string }[]
     beforeApprove?: (ids: ApprovedHoursIds) => Promise<void>
+    clientId?: string
+    projectId?: string
+    linkUser?: boolean
+    approve?: boolean
   },
 ): Promise<ApprovedHoursIds> {
   const weekStart = opts.weekStart ?? '2026-10-05'
-  const client = await insertOne<{ id: string }>('clients', {
-    firm_id: f.firmId,
-    name: opts.clientName ?? `Client ${crypto.randomUUID()}`,
-  })
-  const project = await insertOne<{ id: string }>('projects', {
-    firm_id: f.firmId,
-    client_id: client.id,
-    name: opts.projectName ?? 'Rollout',
-  })
+  const linkUser = opts.linkUser ?? true
+  const submitter = linkUser ? f.consultant : f.manager
+  const client = opts.clientId
+    ? { id: opts.clientId }
+    : await insertOne<{ id: string }>('clients', {
+        firm_id: f.firmId,
+        name: opts.clientName ?? `Client ${crypto.randomUUID()}`,
+      })
+  const project = opts.projectId
+    ? { id: opts.projectId }
+    : await insertOne<{ id: string }>('projects', {
+        firm_id: f.firmId,
+        client_id: client.id,
+        name: opts.projectName ?? 'Rollout',
+      })
   const consultant = await insertOne<{ id: string }>('consultants', {
     firm_id: f.firmId,
     name: opts.consultantName ?? 'Con Sultant',
     email: `c-${crypto.randomUUID()}@test.local`,
     type: 'employee',
-    user_id: f.consultant.id,
+    user_id: linkUser ? f.consultant.id : null,
   })
   await insertOne('consultant_cost_rates', {
     firm_id: f.firmId,
@@ -66,7 +81,7 @@ export async function seedApprovedHours(
     effective_from: '2026-01-01',
   })
 
-  const { data: timesheetId, error: saveErr } = await f.consultant.db.rpc('save_timesheet_week', {
+  const { data: timesheetId, error: saveErr } = await submitter.db.rpc('save_timesheet_week', {
     p_firm: f.firmId,
     p_consultant: consultant.id,
     p_week_start: weekStart,
@@ -79,7 +94,7 @@ export async function seedApprovedHours(
   })
   if (saveErr || !timesheetId) throw new Error(`save_timesheet_week failed: ${saveErr?.message}`)
 
-  const { error: submitErr } = await f.consultant.db.rpc('submit_timesheet', {
+  const { error: submitErr } = await submitter.db.rpc('submit_timesheet', {
     p_timesheet: timesheetId,
   })
   if (submitErr) throw new Error(`submit_timesheet failed: ${submitErr.message}`)
@@ -92,6 +107,7 @@ export async function seedApprovedHours(
     timesheetId: timesheetId as string,
   }
   if (opts.beforeApprove) await opts.beforeApprove(ids)
+  if (opts.approve === false) return ids
 
   const { error: approveErr } = await f.manager.db.rpc('approve_timesheet', {
     p_timesheet: timesheetId,
