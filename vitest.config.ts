@@ -2,7 +2,11 @@ import { defineConfig } from 'vitest/config'
 import path from 'node:path'
 import dotenv from 'dotenv'
 
-const alias = { '@': path.resolve(__dirname, 'src') }
+// `server-only` throws outside the Next server bundle; tests run in plain Node.
+const alias = {
+  '@': path.resolve(__dirname, 'src'),
+  'server-only': path.resolve(__dirname, 'tests/stubs/server-only.ts'),
+}
 const integrationEnv = dotenv.config({ path: '.env.test.local' }).parsed ?? {}
 
 export default defineConfig({
@@ -12,6 +16,7 @@ export default defineConfig({
     projects: [
       {
         resolve: { alias },
+        esbuild: { jsx: 'automatic' as const },
         test: {
           name: 'unit',
           environment: 'node',
@@ -20,6 +25,7 @@ export default defineConfig({
       },
       {
         resolve: { alias },
+        esbuild: { jsx: 'automatic' as const },
         test: {
           name: 'integration',
           environment: 'node',

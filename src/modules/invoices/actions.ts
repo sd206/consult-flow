@@ -4,10 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { requireFirmRole } from '@/lib/auth/context'
 import { fieldErrorsOf, type FormResult, str } from '@/lib/form'
+import { fail, ok } from '@/lib/result'
 import {
   createDraft,
   deleteDraft,
   deleteManualLine,
+  getInvoice,
   issueInvoice,
   regenerateLines,
   saveManualLine,
@@ -142,6 +144,16 @@ export async function issueInvoiceAction(
     ok: true,
     data: { number: issued.data.number, pdfError: pdf?.ok ? null : PDF_ERROR },
   })
+}
+
+export async function regeneratePdfAction(firmId: string, invoiceId: string): Promise<FormResult> {
+  const { db } = await requireFirmRole(firmId, [...MANAGERS])
+  const inv = await getInvoice(db, firmId, invoiceId)
+  if (!inv.ok) return inv
+  if (!['issued', 'partly_paid', 'paid'].includes(inv.data.status)) return fail('Only issued invoices have a PDF.')
+  const pdf = await generateAndStorePdf(db, firmId, invoiceId)
+  if (!pdf.ok) return pdf
+  return done(firmId, invoiceId, ok(undefined))
 }
 
 export async function voidInvoiceAction(firmId: string, id: string): Promise<FormResult> {

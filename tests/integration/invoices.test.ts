@@ -19,6 +19,7 @@ import {
   setDiscount,
   voidInvoice,
 } from '@/modules/invoices/data'
+import { generateAndStorePdf, loadInvoiceDocument, readStoredPdf } from '@/modules/invoices/pdf/storage'
 import { newFirm } from './helpers'
 import { seedApprovedHours } from './invoice-fixtures'
 
@@ -136,5 +137,87 @@ describe('invoices data', () => {
     expect(await issueInvoice(f.manager.db, f.firmId, empty)).toEqual({ ok: false, error: 'Add at least one line before issuing.' })
     must(await deleteDraft(f.manager.db, f.firmId, empty))
     expect(await getInvoice(f.manager.db, f.firmId, empty)).toEqual({ ok: false, error: 'Invoice not found.' })
+  })
+})
+
+describe('invoice PDF storage', () => {
+  let f: Firm
+  let clientId: string
+  let templateId: string
+  beforeAll(async () => {
+    f = await newFirm('Pdf Firm')
+    const ids = await seedApprovedHours(f, {
+      entries: [
+        { workDate: '2026-10-05', hours: '8', note: 'Discovery' },
+        { workDate: '2026-10-06', hours: '7.5', note: 'Workshop' },
+      ],
+    })
+    clientId = ids.clientId
+    templateId = must(await listTemplates(f.manager.db, f.firmId)).find((t) => t.isDefault)!.id
+  })
+
+  // Hours are consumed by the first issue, so later invoices bill a manual line instead.
+  const issued = async (period: [string, string] = ['2026-01-01', '2026-01-31']) => {
+    const id = must(
+      await createDraft(f.manager.db, f.firmId, { clientId, periodStart: period[0], periodEnd: period[1], templateId, consultantIds: null }),
+    ).id
+    if (period[0] !== START) {
+      must(await saveManualLine(f.manager.db, f.firmId, id, { lineId: null, description: 'Fee', quantity: '1', unitPrice: '10.00' }))
+    }
+    must(await issueInvoice(f.manager.db, f.firmId, id))
+    return id
+  }
+
+  it('renders, stores and reads back an issued invoice PDF', async () => {
+    const id = await issued([START, END])
+    const { path } = must(await generateAndStorePdf(f.manager.db, f.firmId, id))
+    expect(path.startsWith(`firms/${f.firmId}/invoices/${id}/`)).toBe(true)
+    expect(path.endsWith('.pdf')).toBe(true)
+    expect(must(await getInvoice(f.manager.db, f.firmId, id)).pdfPath).toBe(path)
+    const bytes = must(await readStoredPdf(f.manager.db, path))
+    expect(Buffer.from(bytes.slice(0, 5)).toString('latin1')).toBe('%PDF-')
+  })
+
+  it('leaves the invoice issued with no PDF when rendering fails', async () => {
+    const id = await issued()
+    const r = await generateAndStorePdf(f.manager.db, f.firmId, id, async () => {
+      throw new Error('boom')
+    }).catch(() => ({ ok: false as const }))
+    expect(r.ok).toBe(false)
+    const inv = must(await getInvoice(f.manager.db, f.firmId, id))
+    expect(inv.status).toBe('issued')
+    expect(inv.pdfPath).toBeNull()
+  })
+})
+
+describe('invoice document detail entries', () => {
+  it('lists the hours for a draft preview and again after issuing', async () => {
+    const f = await newFirm('Detail Firm')
+    const ids = await seedApprovedHours(f, {
+      entries: [
+        { workDate: '2026-10-06', hours: '7.5', note: 'Workshop' },
+        { workDate: '2026-10-05', hours: '8', note: 'Discovery' },
+      ],
+    })
+    const tpl = must(
+      await createTemplate(f.admin.db, f.firmId, {
+        name: 'Detailed',
+        baseLayout: 'classic',
+        options: { ...DEFAULT_TEMPLATE_OPTIONS, showDailyDetail: true },
+      }),
+    )
+    const id = must(
+      await createDraft(f.manager.db, f.firmId, { clientId: ids.clientId, periodStart: START, periodEnd: END, templateId: tpl.id, consultantIds: null }),
+    ).id
+    const draft = must(await loadInvoiceDocument(f.manager.db, f.firmId, id))
+    expect(draft.title).toBe('Draft invoice')
+    expect(draft.detail?.map((d) => [d.date, d.hours, d.note])).toEqual([
+      ['5 Oct 2026', '8.00', 'Discovery'],
+      ['6 Oct 2026', '7.50', 'Workshop'],
+    ])
+    must(await issueInvoice(f.manager.db, f.firmId, id))
+    const issued = must(await loadInvoiceDocument(f.manager.db, f.firmId, id))
+    expect(issued.title).toBe('Invoice')
+    expect(issued.detail).toHaveLength(2)
   })
 })
