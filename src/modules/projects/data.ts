@@ -54,6 +54,18 @@ export type MyAssignment = {
   effectiveTo: string | null
 }
 
+/** One row per project for the signed-in consultant; the period spans all their assignment periods. */
+export type MyProject = {
+  projectId: string
+  projectName: string
+  projectCode: string | null
+  clientName: string
+  /** Earliest effective_from across the consultant's assignments on this project. */
+  from: string
+  /** Latest effective_to, or null when any assignment is open-ended ("ongoing"). */
+  to: string | null
+}
+
 type NameJoin = { name: string } | { name: string }[] | null
 const joinName = (v: NameJoin): string => (Array.isArray(v) ? v[0]?.name : v?.name) ?? ''
 
@@ -326,4 +338,32 @@ export async function listMyAssignments(db: SupabaseClient, firmId: string): Pro
       effectiveTo: a.effective_to,
     })),
   )
+}
+
+/** Groups assignment periods by project (a rate change must not list the project twice). */
+export function groupMyProjects(assignments: MyAssignment[]): MyProject[] {
+  const byProject = new Map<string, MyProject>()
+  for (const a of assignments) {
+    const seen = byProject.get(a.projectId)
+    if (!seen) {
+      byProject.set(a.projectId, {
+        projectId: a.projectId,
+        projectName: a.projectName,
+        projectCode: a.projectCode,
+        clientName: a.clientName,
+        from: a.effectiveFrom,
+        to: a.effectiveTo,
+      })
+      continue
+    }
+    if (a.effectiveFrom < seen.from) seen.from = a.effectiveFrom
+    seen.to = seen.to === null || a.effectiveTo === null ? null : a.effectiveTo > seen.to ? a.effectiveTo : seen.to
+  }
+  return [...byProject.values()].sort((x, y) => x.projectName.localeCompare(y.projectName))
+}
+
+export async function listMyProjects(db: SupabaseClient, firmId: string): Promise<Result<MyProject[]>> {
+  const assignments = await listMyAssignments(db, firmId)
+  if (!assignments.ok) return assignments
+  return ok(groupMyProjects(assignments.data))
 }

@@ -8,6 +8,7 @@ import {
   endAssignment,
   getProject,
   listMyAssignments,
+  listMyProjects,
   listProjects,
   updateProject,
 } from '@/modules/projects/data'
@@ -323,5 +324,33 @@ describe('projects and assignments', () => {
     expect(mine.data).toHaveLength(1)
     expect(mine.data[0]).toMatchObject({ projectId: s.projectId, effectiveFrom: '2026-01-01' })
     expect(JSON.stringify(mine.data)).not.toContain('180')
+  })
+
+  it('listMyProjects shows one row per project across back-to-back rate periods', async () => {
+    const f = await newFirm()
+    const s = await setup(f)
+    await adminDb().from('consultants').update({ user_id: f.consultant.id }).eq('id', s.consultantId)
+    const a = await addAssignment(f.manager.db, f.firmId, {
+      projectId: s.projectId,
+      consultantId: s.consultantId,
+      clientRate: '180',
+      effectiveFrom: '2026-01-01',
+    })
+    expect(a.ok).toBe(true)
+    if (!a.ok) return
+    const changed = await changeClientRate(f.manager.db, f.firmId, a.data.id, {
+      clientRate: '200',
+      effectiveFrom: '2026-07-01',
+    })
+    expect(changed.ok).toBe(true)
+    const periods = await listMyAssignments(f.consultant.db, f.firmId)
+    expect(periods.ok && periods.data).toHaveLength(2)
+
+    const mine = await listMyProjects(f.consultant.db, f.firmId)
+    expect(mine.ok).toBe(true)
+    if (!mine.ok) return
+    expect(mine.data).toEqual([
+      expect.objectContaining({ projectId: s.projectId, from: '2026-01-01', to: null }),
+    ])
   })
 })
