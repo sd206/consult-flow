@@ -11,16 +11,22 @@ import { DEFAULT_TEMPLATE_OPTIONS } from '@/modules/invoice-templates/schemas'
 import {
   createDraft,
   deleteDraft,
+  deleteManualLine,
   getInvoice,
   issueInvoice,
   listCandidates,
   listInvoices,
+  regenerateLines,
   saveManualLine,
   setDiscount,
+  setInvoicePdf,
+  setLineDescription,
+  updateDraftHeader,
+  updatePeriod,
   voidInvoice,
 } from '@/modules/invoices/data'
 import { generateAndStorePdf, loadInvoiceDocument, readStoredPdf } from '@/modules/invoices/pdf/storage'
-import { newFirm } from './helpers'
+import { adminDb, newFirm } from './helpers'
 import { seedApprovedHours } from './invoice-fixtures'
 
 type Firm = Awaited<ReturnType<typeof newFirm>>
@@ -137,6 +143,46 @@ describe('invoices data', () => {
     expect(await issueInvoice(f.manager.db, f.firmId, empty)).toEqual({ ok: false, error: 'Add at least one line before issuing.' })
     must(await deleteDraft(f.manager.db, f.firmId, empty))
     expect(await getInvoice(f.manager.db, f.firmId, empty)).toEqual({ ok: false, error: 'Invoice not found.' })
+  })
+})
+
+describe('invoice-scoped data functions check the firm', () => {
+  it("a manager of two firms can't act on firm B's invoice through firm A", async () => {
+    const [a, b] = await Promise.all([newFirm('Scope A'), newFirm('Scope B')])
+    const { error: mErr } = await adminDb()
+      .from('firm_members')
+      .insert({ firm_id: b.firmId, user_id: a.manager.id, role: 'manager' })
+    if (mErr) throw new Error(`membership insert failed: ${mErr.message}`)
+    const ids = await seedApprovedHours(b, { entries: [{ workDate: '2026-10-05', hours: '8' }] })
+    const tplB = must(await listTemplates(b.manager.db, b.firmId)).find((t) => t.isDefault)!.id
+    const id = must(
+      await createDraft(b.manager.db, b.firmId, { clientId: ids.clientId, periodStart: START, periodEnd: END, templateId: tplB, consultantIds: null }),
+    ).id
+    const lineId = must(await getInvoice(b.manager.db, b.firmId, id)).lines[0].id
+    const NF = { ok: false, error: 'Invoice not found.' }
+    const db = a.manager.db
+
+    expect(await issueInvoice(db, a.firmId, id)).toEqual(NF)
+    expect(await regenerateLines(db, a.firmId, id, [])).toEqual(NF)
+    expect(
+      await updateDraftHeader(db, a.firmId, id, { subject: 'X', issueDate: '2026-11-09', dueDate: '2026-12-09', taxPercent: '1.00', templateId: tplB }),
+    ).toEqual(NF)
+    expect(await updatePeriod(db, a.firmId, id, { periodStart: START, periodEnd: '2026-10-02', consultantIds: null })).toEqual(NF)
+    expect(await setLineDescription(db, a.firmId, lineId, 'Hijacked')).toEqual(NF)
+    expect(await saveManualLine(db, a.firmId, id, { lineId: null, description: 'X', quantity: '1', unitPrice: '1.00' })).toEqual(NF)
+    expect(await deleteManualLine(db, a.firmId, lineId)).toEqual(NF)
+    expect(await setDiscount(db, a.firmId, id, { type: 'amount', value: '1.00', label: null })).toEqual(NF)
+    expect(await deleteDraft(db, a.firmId, id)).toEqual(NF)
+    expect(await voidInvoice(db, a.firmId, id)).toEqual(NF)
+    expect(await setInvoicePdf(db, a.firmId, id, `firms/${b.firmId}/invoices/${id}/x.pdf`)).toEqual(NF)
+    expect(await generateAndStorePdf(db, a.firmId, id)).toEqual(NF)
+
+    const inv = must(await getInvoice(b.manager.db, b.firmId, id))
+    expect(inv.status).toBe('draft')
+    expect(inv.number).toBeNull()
+    expect(inv.lines.map((l) => [l.kind, l.description])).toEqual([['time', 'Rollout']])
+    expect(inv.subject).toBeNull()
+    expect(inv.discountType).toBe('none')
   })
 })
 

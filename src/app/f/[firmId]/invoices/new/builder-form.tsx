@@ -34,6 +34,10 @@ export function BuilderForm({
       onSubmit={(e) => {
         e.preventDefault()
         const fd = new FormData(e.currentTarget)
+        // Every listed box ticked = all consultants (null): the draft then also picks up
+        // consultants whose hours fall only in a later, wider period.
+        const boxes = [...e.currentTarget.querySelectorAll<HTMLInputElement>('input[name="consultant"]')]
+        if (boxes.every((b) => b.checked)) fd.set('allConsultants', '1')
         startTransition(async () => {
           // On success the action redirects to the new draft.
           setResult(await createDraftAction(firmId, fd))

@@ -56,6 +56,7 @@ const invoice = (over: Partial<InvoiceDetail> = {}): InvoiceDetail => ({
     },
   ],
   consultantIds: ['k'],
+  consultantFilter: null,
   ...over,
 })
 
@@ -117,6 +118,18 @@ describe('buildInvoiceDocument', () => {
     const d = build(invoice(), template({ showDailyDetail: true }))
     expect(d.detail?.map((r) => r.date)).toEqual(['5 Oct 2026', '6 Oct 2026'])
     expect(d.detail?.[0]).toEqual({ date: '5 Oct 2026', consultant: 'Con Sultant', project: 'Rollout', hours: '3.33', note: 'Discovery' })
+  })
+
+  it('has no detail page when daily detail is on but there are no hours', () => {
+    const d = buildInvoiceDocument({
+      invoice: invoice(),
+      template: template({ showDailyDetail: true }),
+      firm,
+      client,
+      logo: null,
+      detailEntries: [],
+    })
+    expect(d.detail).toBeNull()
   })
 
   it('payment terms fall back to the due date', () => {

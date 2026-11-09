@@ -84,7 +84,6 @@ describe('mapDbError', () => {
     ["TEMPLATE_IS_DEFAULT", "The default template can't be deleted. Make another template the default first."],
     ["invoice_templates_firm_name_key", "That name is already in use."],
     ["invoice_templates_accent_chk", "Use a colour like #1F2937."],
-    ["invoices_template_fk", "This template is used by invoices, so it can't be deleted."],
     ["invoices_period_chk", "The period end must be on or after the period start."],
     ["invoices_due_chk", "The due date must be on or after the issue date."],
     ["invoices_tax_chk", "Tax must be between 0 and 100 percent."],
@@ -98,6 +97,32 @@ describe('mapDbError', () => {
 
   it.each(invoiceCases)('invoice error %s', (needle, expected) => {
     expect(mapDbError({ code: 'P0001', message: `x ${needle} y` })).toBe(expected)
+  })
+
+  const fkDelete = (name: string, table: string) => ({
+    code: '23503',
+    message: `update or delete on table "${table}" violates foreign key constraint "${name}" on table "invoices"`,
+    details: `Key (firm_id, id)=(a, b) is still referenced from table "invoices".`,
+  })
+  const fkInsert = (name: string, table: string) => ({
+    code: '23503',
+    message: `insert or update on table "invoices" violates foreign key constraint "${name}"`,
+    details: `Key (firm_id, template_id)=(a, b) is not present in table "${table}".`,
+  })
+
+  it('splits invoice foreign key errors into delete and missing-row messages', () => {
+    expect(mapDbError(fkDelete('invoices_template_fk', 'invoice_templates'))).toBe(
+      "This template is used by invoices, so it can't be deleted.",
+    )
+    expect(mapDbError(fkInsert('invoices_template_fk', 'invoice_templates'))).toBe('Template not found.')
+    expect(mapDbError(fkDelete('invoices_client_fk', 'clients'))).toBe("This client has invoices, so it can't be deleted.")
+    expect(mapDbError(fkInsert('invoices_client_fk', 'clients'))).toBe('Client not found.')
+  })
+
+  it('maps a duplicate invoice number', () => {
+    expect(mapDbError(unique('invoices_firm_number_key'))).toBe(
+      'That invoice number is already used. Change the number pattern in Settings, then issue again.',
+    )
   })
 
   it('logs the raw error', () => {

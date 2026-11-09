@@ -62,6 +62,8 @@ export type InvoiceDetail = InvoiceListRow & {
   } | null
   lines: InvoiceLine[]
   consultantIds: string[]
+  /** The draft's consultant selection: null = all consultants, [] = none. */
+  consultantFilter: string[] | null
 }
 
 export type Candidate = {
@@ -128,7 +130,7 @@ export async function listInvoices(
   return ok(rows.map(toListRow))
 }
 
-const DETAIL_COLS = `${LIST_COLS}, client_id, template_id, subject, tax_percent::text, subtotal::text, discount_type,
+const DETAIL_COLS = `${LIST_COLS}, client_id, template_id, consultant_filter, subject, tax_percent::text, subtotal::text, discount_type,
   discount_value::text, discount_label, discount_amount::text, tax_amount::text, amount_paid::text, pdf_path,
   bill_to_name, bill_to_contact_name, bill_to_email, bill_to_phone, bill_to_address,
   from_name, from_address, from_contact_name, from_contact_email, from_contact_phone, from_logo_path`
@@ -136,6 +138,7 @@ const DETAIL_COLS = `${LIST_COLS}, client_id, template_id, subject, tax_percent:
 type DetailDb = ListDb & {
   client_id: string
   template_id: string
+  consultant_filter: string[] | null
   subject: string | null
   tax_percent: string
   subtotal: string
@@ -243,6 +246,7 @@ export async function getInvoice(db: SupabaseClient, firmId: string, id: string)
           },
     lines,
     consultantIds,
+    consultantFilter: r.consultant_filter,
   })
 }
 
@@ -288,6 +292,23 @@ async function rpcVoid(db: SupabaseClient, fn: string, args: Record<string, unkn
   return ok(undefined)
 }
 
+/**
+ * Invoice-scoped RPCs take only the row id and authorise against the row's own
+ * firm, so a member of several firms could reach another firm's invoice through
+ * this firm's pages. Confirm the invoice (or line) belongs to firmId first.
+ */
+export async function ensureInvoiceInFirm(db: SupabaseClient, firmId: string, id: string): Promise<Result<void>> {
+  const { data, error } = await db.from('invoices').select('id').eq('firm_id', firmId).eq('id', id).maybeSingle()
+  if (error) return fail(mapDbError(error))
+  return data ? ok(undefined) : fail(NOT_FOUND)
+}
+
+async function ensureLineInFirm(db: SupabaseClient, firmId: string, lineId: string): Promise<Result<void>> {
+  const { data, error } = await db.from('invoice_lines').select('id').eq('firm_id', firmId).eq('id', lineId).maybeSingle()
+  if (error) return fail(mapDbError(error))
+  return data ? ok(undefined) : fail(NOT_FOUND)
+}
+
 export async function createDraft(
   db: SupabaseClient,
   firmId: string,
@@ -305,23 +326,25 @@ export async function createDraft(
   return ok({ id: data as string })
 }
 
-// Invoice-scoped RPCs take only the row id; the firm id is accepted for a uniform
-// signature and enforced by the database (row lock + role check on the row's own firm).
 export async function regenerateLines(
   db: SupabaseClient,
-  _firmId: string,
+  firmId: string,
   id: string,
   consultantIds: string[] | null,
 ): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'regenerate_invoice_lines', { p_invoice: id, p_consultants: consultantIds })
 }
 
 export async function updateDraftHeader(
   db: SupabaseClient,
-  _firmId: string,
+  firmId: string,
   id: string,
   input: { subject: string | null; issueDate: string; dueDate: string; taxPercent: string; templateId: string },
 ): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'update_invoice_draft', {
     p_invoice: id,
     p_subject: input.subject,
@@ -334,10 +357,12 @@ export async function updateDraftHeader(
 
 export async function updatePeriod(
   db: SupabaseClient,
-  _firmId: string,
+  firmId: string,
   id: string,
   input: { periodStart: string; periodEnd: string; consultantIds: string[] | null },
 ): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'update_invoice_period', {
     p_invoice: id,
     p_start: input.periodStart,
@@ -348,19 +373,23 @@ export async function updatePeriod(
 
 export async function setLineDescription(
   db: SupabaseClient,
-  _firmId: string,
+  firmId: string,
   lineId: string,
   description: string,
 ): Promise<Result<void>> {
+  const scope = await ensureLineInFirm(db, firmId, lineId)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'set_invoice_line_description', { p_line: lineId, p_description: description })
 }
 
 export async function saveManualLine(
   db: SupabaseClient,
-  _firmId: string,
+  firmId: string,
   invoiceId: string,
   input: { lineId: string | null; description: string; quantity: string; unitPrice: string },
 ): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, invoiceId)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'save_manual_line', {
     p_invoice: invoiceId,
     p_line: input.lineId,
@@ -370,16 +399,20 @@ export async function saveManualLine(
   })
 }
 
-export async function deleteManualLine(db: SupabaseClient, _firmId: string, lineId: string): Promise<Result<void>> {
+export async function deleteManualLine(db: SupabaseClient, firmId: string, lineId: string): Promise<Result<void>> {
+  const scope = await ensureLineInFirm(db, firmId, lineId)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'delete_manual_line', { p_line: lineId })
 }
 
 export async function setDiscount(
   db: SupabaseClient,
-  _firmId: string,
+  firmId: string,
   id: string,
   input: { type: InvoiceDiscountType; value: string; label: string | null },
 ): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'set_invoice_discount', {
     p_invoice: id,
     p_type: input.type,
@@ -388,20 +421,28 @@ export async function setDiscount(
   })
 }
 
-export async function deleteDraft(db: SupabaseClient, _firmId: string, id: string): Promise<Result<void>> {
+export async function deleteDraft(db: SupabaseClient, firmId: string, id: string): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'delete_invoice_draft', { p_invoice: id })
 }
 
-export async function issueInvoice(db: SupabaseClient, _firmId: string, id: string): Promise<Result<{ number: string }>> {
+export async function issueInvoice(db: SupabaseClient, firmId: string, id: string): Promise<Result<{ number: string }>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   const { data, error } = await db.rpc('issue_invoice', { p_invoice: id })
   if (error || typeof data !== 'string') return fail(mapDbError(error))
   return ok({ number: data })
 }
 
-export async function voidInvoice(db: SupabaseClient, _firmId: string, id: string): Promise<Result<void>> {
+export async function voidInvoice(db: SupabaseClient, firmId: string, id: string): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'void_invoice', { p_invoice: id })
 }
 
-export async function setInvoicePdf(db: SupabaseClient, _firmId: string, id: string, path: string): Promise<Result<void>> {
+export async function setInvoicePdf(db: SupabaseClient, firmId: string, id: string, path: string): Promise<Result<void>> {
+  const scope = await ensureInvoiceInFirm(db, firmId, id)
+  if (!scope.ok) return scope
   return rpcVoid(db, 'set_invoice_pdf', { p_invoice: id, p_path: path })
 }

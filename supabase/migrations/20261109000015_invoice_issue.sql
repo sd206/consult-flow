@@ -3,7 +3,9 @@
 -- issue_invoice assigns the legal number under the firm row lock, freezes
 -- the bill-to / from details, and links every time line to the exact
 -- approved entries it stands for so the same hours can never be billed
--- twice. Lock order everywhere: invoice row, then firm row, then entries.
+-- twice. The lock order below (invoice row, firm row, entries) is
+-- superseded: issue_invoice is replaced in 20261109000016_invoice_issue_locking.sql,
+-- whose header documents the current order (it also locks timesheets).
 -- Any raise rolls back the whole call (nothing linked, no number consumed).
 
 -- ---------------------------------------------------------------------------

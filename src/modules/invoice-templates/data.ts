@@ -51,7 +51,7 @@ export async function createTemplate(
 ): Promise<Result<{ id: string }>> {
   const { data, error } = await db
     .from('invoice_templates')
-    .insert({ firm_id: firmId, name: input.name, base_layout: input.baseLayout, options: input.options, is_default: false })
+    .insert({ firm_id: firmId, name: input.name, base_layout: input.baseLayout, options: input.options })
     .select('id')
     .single()
   if (error || !data) return fail(mapDbError(error))

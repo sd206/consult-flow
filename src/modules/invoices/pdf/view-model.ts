@@ -151,7 +151,8 @@ export function buildInvoiceDocument(input: {
     footer: o.footerText,
     layout: template.baseLayout,
     accentColor: o.accentColor,
-    detail: o.showDailyDetail
+    // No entries, no "Hours detail" page.
+    detail: o.showDailyDetail && input.detailEntries.length > 0
       ? [...input.detailEntries]
           .sort(
             (a, b) =>

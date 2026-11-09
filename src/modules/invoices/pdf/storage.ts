@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { mapDbError } from '@/lib/db-errors'
 import { fail, ok, type Result } from '@/lib/result'
 import { getTemplate } from '@/modules/invoice-templates/data'
-import { getInvoice, setInvoicePdf, type InvoiceDetail } from '../data'
+import { ensureInvoiceInFirm, getInvoice, setInvoicePdf, type InvoiceDetail } from '../data'
 import { renderInvoicePdf } from './render'
 import {
   buildInvoiceDocument,
@@ -162,6 +162,10 @@ export async function generateAndStorePdf(
     console.error('invoice PDF render failed', e)
     return fail(PDF_FAILED)
   }
+
+  // Never upload into another firm's folder, even if the document loaded.
+  const scope = await ensureInvoiceInFirm(db, firmId, invoiceId)
+  if (!scope.ok) return scope
 
   const path = `firms/${firmId}/invoices/${invoiceId}/${randomUUID()}.pdf`
   const up = await db.storage.from(BUCKET).upload(path, bytes, { contentType: 'application/pdf' })

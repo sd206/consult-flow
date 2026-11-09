@@ -17,6 +17,20 @@ describe('invoice schemas', () => {
     expect(manualLineSchema.safeParse({ ...base, quantity: '1.234' }).success).toBe(false)
     expect(manualLineSchema.parse({ ...base, quantity: '2' }).quantity).toBe('2.00')
   })
+  const issueOf = (r: { success: boolean; error?: { issues: { path: PropertyKey[]; message: string }[] } }, field: string) =>
+    r.error?.issues.find((i) => i.path[0] === field)?.message
+  it('manual line quantity and unit price have upper limits', () => {
+    const base = { description: 'x', quantity: '1', unitPrice: '5' }
+    expect(manualLineSchema.parse({ ...base, quantity: '9999999.99' }).quantity).toBe('9999999.99')
+    expect(issueOf(manualLineSchema.safeParse({ ...base, quantity: '10000000' }), 'quantity')).toBe('Quantity is too large.')
+    expect(manualLineSchema.parse({ ...base, unitPrice: '9999999999.99' }).unitPrice).toBe('9999999999.99')
+    expect(issueOf(manualLineSchema.safeParse({ ...base, unitPrice: '10000000000' }), 'unitPrice')).toBe('Amount is too large.')
+    expect(issueOf(manualLineSchema.safeParse({ ...base, unitPrice: '99,999,999,999.00' }), 'unitPrice')).toBe('Amount is too large.')
+  })
+  it('fixed discount has the same upper limit as a unit price', () => {
+    expect(discountSchema.parse({ type: 'amount', value: '9999999999.99', label: '' }).value).toBe('9999999999.99')
+    expect(issueOf(discountSchema.safeParse({ type: 'amount', value: '10000000000', label: '' }), 'value')).toBe('Amount is too large.')
+  })
   it('header requires due on or after issue and tax 0-100', () => {
     const base = { subject: '', issueDate: '2026-11-01', dueDate: '2026-11-01', taxPercent: '8.25', templateId: 't' }
     expect(headerSchema.parse(base).taxPercent).toBe('8.25')

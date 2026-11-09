@@ -18,15 +18,19 @@ export function IssuedActions({
   const { pending, run, error } = useRun()
   const pdfHref = `/f/${firmId}/invoices/${invoiceId}/pdf`
 
+  const isVoid = status === 'void'
+  const canRegenerate = ['issued', 'partly_paid', 'paid'].includes(status)
+
   return (
     <div className="mt-6">
+      {isVoid && <p className="mb-3 text-sm font-medium">This invoice is void.</p>}
       <div className="flex flex-wrap items-center gap-3">
         {hasPdf && (
           <a href={pdfHref} className="inline-flex h-8 items-center rounded-lg border px-2.5 text-sm font-medium">
-            Download PDF
+            {isVoid ? 'Download original PDF' : 'Download PDF'}
           </a>
         )}
-        {!hasPdf && (
+        {!hasPdf && canRegenerate && (
           <Button type="button" variant="outline" disabled={pending} onClick={() => run(() => regeneratePdfAction(firmId, invoiceId))}>
             Regenerate PDF
           </Button>

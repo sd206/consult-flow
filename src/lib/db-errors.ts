@@ -49,7 +49,7 @@ const BY_MATCH: [string, string][] = [
   ['TEMPLATE_IS_DEFAULT', "The default template can't be deleted. Make another template the default first."],
   ['invoice_templates_firm_name_key', NAME_IN_USE],
   ['invoice_templates_accent_chk', 'Use a colour like #1F2937.'],
-  ['invoices_template_fk', "This template is used by invoices, so it can't be deleted."],
+  ['invoices_firm_number_key', 'That invoice number is already used. Change the number pattern in Settings, then issue again.'],
   ['invoices_period_chk', 'The period end must be on or after the period start.'],
   ['invoices_due_chk', 'The due date must be on or after the issue date.'],
   ['invoices_tax_chk', 'Tax must be between 0 and 100 percent.'],
@@ -61,10 +61,23 @@ const BY_MATCH: [string, string][] = [
   ['invoices_discount_chk', "A percentage discount must be between 0 and 100, and an amount can't be negative."],
 ]
 
+/**
+ * Foreign keys hit both when the referenced row is deleted (the details say
+ * "is still referenced") and when a row points at a missing one.
+ * [constraint, delete message, missing-row message]
+ */
+const BY_FK: [string, string, string][] = [
+  ['invoices_template_fk', "This template is used by invoices, so it can't be deleted.", 'Template not found.'],
+  ['invoices_client_fk', "This client has invoices, so it can't be deleted.", 'Client not found.'],
+]
+
 export function mapDbError(err: DbError | null): string {
   if (!err) return GENERIC
   console.error(err)
   const text = `${err.message ?? ''} ${err.details ?? ''}`
+  for (const [needle, onDelete, missing] of BY_FK) {
+    if (text.includes(needle)) return text.includes('is still referenced') ? onDelete : missing
+  }
   for (const [needle, message] of BY_MATCH) {
     if (text.includes(needle)) return message
   }

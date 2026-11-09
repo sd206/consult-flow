@@ -112,6 +112,57 @@ describe('invoice templates', () => {
     expect((await templates(f)).map((r) => r.id)).toEqual([modernId])
   })
 
+  it('clients can only write name, layout and options', async () => {
+    const created = await f.admin.db
+      .from('invoice_templates')
+      .insert({ firm_id: f.firmId, name: 'Grant Probe' })
+      .select('id, is_default')
+      .single()
+    expect(created.error).toBeNull()
+    const probe = created.data as { id: string; is_default: boolean }
+    expect(probe.is_default).toBe(false)
+
+    const DENIED = /permission denied for table invoice_templates/
+    const sneakyDefault = await f.admin.db
+      .from('invoice_templates')
+      .insert({ firm_id: f.firmId, name: 'Sneaky Default', is_default: true })
+    expect(text(sneakyDefault.error)).toMatch(DENIED)
+
+    // Clearing the current default directly would leave the firm with none.
+    const unset = await f.admin.db.from('invoice_templates').update({ is_default: false }).eq('id', modernId)
+    expect(text(unset.error)).toMatch(DENIED)
+
+    // The admin is also an admin of the other firm, so only the grant stops the move.
+    const other = await newFirm('Template Thief')
+    const { error: mErr } = await adminDb()
+      .from('firm_members')
+      .insert({ firm_id: other.firmId, user_id: f.admin.id, role: 'admin' })
+    if (mErr) throw new Error(`membership insert failed: ${mErr.message}`)
+    const move = await f.admin.db.from('invoice_templates').update({ firm_id: other.firmId }).eq('id', probe.id)
+    expect(text(move.error)).toMatch(DENIED)
+
+    const rename = await f.admin.db
+      .from('invoice_templates')
+      .update({ name: 'Grant Probe 2', base_layout: 'compact', options: { accentColor: '#123456' } })
+      .eq('id', probe.id)
+    expect(rename.error).toBeNull()
+
+    const { data: row } = await adminDb()
+      .from('invoice_templates')
+      .select('firm_id, name, is_default')
+      .eq('id', probe.id)
+      .single()
+    expect(row).toEqual({ firm_id: f.firmId, name: 'Grant Probe 2', is_default: false })
+
+    const def = await f.admin.db.rpc('set_default_template', { p_template: probe.id })
+    expect(def.error).toBeNull()
+    expect((await templates(f)).filter((r) => r.is_default).map((r) => r.id)).toEqual([probe.id])
+    const back = await f.admin.db.rpc('set_default_template', { p_template: modernId })
+    expect(back.error).toBeNull()
+    const del = await f.admin.db.from('invoice_templates').delete().eq('id', probe.id)
+    expect(del.error).toBeNull()
+  })
+
   it('bad accent colour rejected', async () => {
     const { error } = await f.admin.db
       .from('invoice_templates')

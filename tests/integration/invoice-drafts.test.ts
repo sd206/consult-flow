@@ -552,6 +552,79 @@ describe('header and period', () => {
   })
 })
 
+describe('consultant filter', () => {
+  async function filterOf(invoiceId: string): Promise<string[] | null> {
+    const { data, error } = await adminDb().from('invoices').select('consultant_filter').eq('id', invoiceId).single()
+    if (error || !data) throw new Error(`invoice read failed: ${error?.message}`)
+    return (data as { consultant_filter: string[] | null }).consultant_filter
+  }
+
+  it('the draft remembers an empty selection across regenerate and period changes', async () => {
+    const f = await newFirm()
+    const ids = await seedApprovedHours(f, { entries: [{ workDate: MON, hours: '8' }] })
+    const invoiceId = await mustCreateDraft(f, ids.clientId)
+    expect(await filterOf(invoiceId)).toBeNull()
+    expect(await lines(invoiceId)).toHaveLength(1)
+
+    let r = await f.manager.db.rpc('regenerate_invoice_lines', { p_invoice: invoiceId, p_consultants: [] })
+    expect(r.error).toBeNull()
+    expect(await filterOf(invoiceId)).toEqual([])
+    expect(await lines(invoiceId)).toHaveLength(0)
+
+    r = await f.manager.db.rpc('update_invoice_period', {
+      p_invoice: invoiceId,
+      p_start: START,
+      p_end: END,
+      p_consultants: await filterOf(invoiceId),
+    })
+    expect(r.error).toBeNull()
+    expect(await filterOf(invoiceId)).toEqual([])
+    expect(await lines(invoiceId)).toHaveLength(0)
+
+    r = await f.manager.db.rpc('regenerate_invoice_lines', {
+      p_invoice: invoiceId,
+      p_consultants: [ids.consultantId],
+    })
+    expect(r.error).toBeNull()
+    expect(await filterOf(invoiceId)).toEqual([ids.consultantId])
+    expect(await lines(invoiceId)).toHaveLength(1)
+  })
+
+  it('create stores the selection it was given', async () => {
+    const f = await newFirm()
+    const ids = await seedApprovedHours(f, { entries: [{ workDate: MON, hours: '8' }] })
+    const invoiceId = await mustCreateDraft(f, ids.clientId, { consultants: [] })
+    expect(await filterOf(invoiceId)).toEqual([])
+  })
+
+  it('widening the period with no filter picks up a consultant whose hours are only in the added days', async () => {
+    const f = await newFirm()
+    const a = await seedApprovedHours(f, {
+      consultantName: 'Alice Able',
+      entries: [{ workDate: MON, hours: '5' }],
+    })
+    const b = await seedApprovedHours(f, {
+      clientId: a.clientId,
+      projectId: a.projectId,
+      consultantName: 'Bob Baker',
+      linkUser: false,
+      entries: [{ workDate: WED, hours: '3' }],
+    })
+    const invoiceId = await mustCreateDraft(f, a.clientId, { start: START, end: MON })
+    expect((await lines(invoiceId)).map((l) => l.consultant_id)).toEqual([a.consultantId])
+
+    const r = await f.manager.db.rpc('update_invoice_period', {
+      p_invoice: invoiceId,
+      p_start: START,
+      p_end: END,
+      p_consultants: null,
+    })
+    expect(r.error).toBeNull()
+    expect(await filterOf(invoiceId)).toBeNull()
+    expect((await lines(invoiceId)).map((l) => l.consultant_id)).toEqual([a.consultantId, b.consultantId])
+  })
+})
+
 describe('access and lifecycle', () => {
   it("consultant can't touch drafts; other firms can't either", async () => {
     const { f, ids, invoiceId } = await roundingDraft()

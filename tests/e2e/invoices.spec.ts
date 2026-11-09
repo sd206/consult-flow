@@ -47,10 +47,19 @@ async function buildDraft(page: Page, f: Firm) {
   await expect(page.getByRole('heading', { name: 'Draft invoice' })).toBeVisible()
 }
 
+const ISSUE_TAIL = "It gets the next number and can't be edited afterwards."
+
 async function issue(page: Page) {
-  page.once('dialog', (d) => d.accept())
+  let message = ''
+  page.once('dialog', (d) => {
+    message = d.message()
+    void d.accept()
+  })
   await page.getByRole('button', { name: 'Issue invoice' }).click()
   await expect(page.getByTestId('status')).toHaveText('Issued')
+  // Drafts are dated today, so no past-date warning.
+  expect(message).toMatch(/^Issue this invoice dated \d{1,2} [A-Z][a-z]{2} \d{4} and due \d{1,2} [A-Z][a-z]{2} \d{4}\? /)
+  expect(message.endsWith(ISSUE_TAIL)).toBe(true)
 }
 
 test('manager builds, edits and issues an invoice', async ({ page }) => {
@@ -103,10 +112,64 @@ test('void returns hours', async ({ page }) => {
   page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: 'Void invoice' }).click()
   await expect(page.getByTestId('status')).toHaveText('Void')
+  await expect(page.getByText('This invoice is void.')).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Download original PDF' })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Download PDF', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Regenerate PDF' })).toHaveCount(0)
 
   await page.goto(`/f/${f.firmId}/invoices/new`)
   await findHours(page)
   await expect(page.getByRole('cell', { name: '15.50' })).toBeVisible()
+})
+
+test('the draft remembers which consultants are included', async ({ page }) => {
+  const f = await seed('Invoice Selection Firm')
+  await buildDraft(page, f)
+  const box = page.getByRole('checkbox', { name: 'Con Sultant' })
+  const hoursLine = page.getByLabel('Line description Con Sultant Rollout')
+  await expect(box).toBeChecked()
+  await expect(hoursLine).toBeVisible()
+
+  await box.uncheck()
+  await page.getByRole('button', { name: 'Regenerate lines' }).click()
+  await expect(hoursLine).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('checkbox', { name: 'Con Sultant' })).not.toBeChecked()
+  await expect(hoursLine).toHaveCount(0)
+  await expect(page.getByTestId('subtotal')).toHaveText('$0.00')
+
+  await page.getByRole('checkbox', { name: 'Con Sultant' }).check()
+  await page.getByRole('button', { name: 'Regenerate lines' }).click()
+  await expect(hoursLine).toHaveValue('Discovery; Workshop')
+  await page.reload()
+  await expect(page.getByRole('checkbox', { name: 'Con Sultant' })).toBeChecked()
+  await expect(page.getByTestId('subtotal')).toHaveText('$2,066.62')
+})
+
+test('issuing warns about an issue date in the past', async ({ page }) => {
+  const f = await seed('Invoice Past Date Firm')
+  await buildDraft(page, f)
+  await page.getByLabel('Issue date').fill('2026-01-05')
+  await page.getByLabel('Due date').fill('2026-02-04')
+  await page.getByRole('button', { name: 'Save details' }).click()
+  // Wait for the save to land before reloading (the field already shows the typed value).
+  await expect
+    .poll(async () => {
+      const { data } = await adminDb().from('invoices').select('issue_date').eq('firm_id', f.firmId).single()
+      return (data as { issue_date: string } | null)?.issue_date
+    })
+    .toBe('2026-01-05')
+  await page.reload()
+  await expect(page.getByLabel('Issue date')).toHaveValue('2026-01-05')
+
+  let message = ''
+  page.once('dialog', (d) => {
+    message = d.message()
+    void d.dismiss()
+  })
+  await page.getByRole('button', { name: 'Issue invoice' }).click()
+  await expect.poll(() => message).toBe(`The issue date is in the past. Issue this invoice dated 5 Jan 2026 and due 4 Feb 2026? ${ISSUE_TAIL}`)
+  await expect(page.getByRole('heading', { name: 'Draft invoice' })).toBeVisible()
 })
 
 test('preview a draft', async ({ page }) => {

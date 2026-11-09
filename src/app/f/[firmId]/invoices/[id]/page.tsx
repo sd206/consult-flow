@@ -30,14 +30,21 @@ export default async function InvoicePage({ params }: { params: Promise<{ firmId
       listTemplates(db, firmId),
       listCandidates(db, firmId, inv.clientId, inv.periodStart, inv.periodEnd),
     ])
+    // Listed: consultants on current time lines ∪ candidates for the period ∪ the stored selection.
     const names = new Map<string, string>()
     for (const l of inv.lines) if (l.kind === 'time' && l.consultantId) names.set(l.consultantId, l.consultantName ?? '')
     if (candidates.ok) for (const c of candidates.data) if (!names.has(c.consultantId)) names.set(c.consultantId, c.consultantName)
-    const current = new Set(inv.consultantIds)
+    const filter = inv.consultantFilter
+    const unnamed = (filter ?? []).filter((cid) => !names.has(cid))
+    if (unnamed.length > 0) {
+      const { data } = await db.from('consultants').select('id, name').eq('firm_id', firmId).in('id', unnamed)
+      for (const c of (data ?? []) as { id: string; name: string }[]) names.set(c.id, c.name)
+    }
+    // null = all consultants (every box ticked); otherwise ticked iff selected.
     const consultants: ConsultantOption[] = [...names].map(([cid, name]) => ({
       id: cid,
       name,
-      checked: current.size === 0 || current.has(cid),
+      checked: filter === null || filter.includes(cid),
     }))
     return (
       <div>

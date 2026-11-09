@@ -12,6 +12,7 @@ import {
   updatePeriodAction,
 } from '@/modules/invoices/actions'
 import type { InvoiceDetail } from '@/modules/invoices/data'
+import { issueConfirmText } from '@/modules/invoices/issue-confirm'
 import { DiscountForm } from './discount-form'
 import { LinesTable } from './lines-table'
 import { useRun } from './use-run'
@@ -114,6 +115,12 @@ function PeriodForm({
       onSubmit={(e) => {
         e.preventDefault()
         const fd = new FormData(e.currentTarget)
+        // Every listed box ticked = all consultants (null), so consultants whose hours
+        // only fall in a widened period are picked up too. With nothing listed, keep
+        // the stored selection (null or none).
+        const boxes = [...e.currentTarget.querySelectorAll<HTMLInputElement>('input[name="consultant"]')]
+        const all = boxes.length > 0 ? boxes.every((b) => b.checked) : invoice.consultantFilter === null
+        if (all) fd.set('allConsultants', '1')
         const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
         run(() =>
           submitter?.value === 'period'
@@ -230,7 +237,7 @@ export function DraftEditor({
           type="button"
           disabled={pending}
           onClick={() => {
-            if (window.confirm("Issue this invoice? It gets the next number and can't be edited afterwards.")) {
+            if (window.confirm(issueConfirmText(invoice.issueDate, invoice.dueDate))) {
               run(() => issueInvoiceAction(firmId, invoice.id))
             }
           }}

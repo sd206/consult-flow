@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { isIsoDate } from '@/lib/domain/dates'
 import { parseMoney } from '@/lib/domain/money'
+import { fail, type Result } from '@/lib/result'
 
 const date = (msg: string) => z.string().refine(isIsoDate, msg)
 const TWO_DP = /^\d+(\.\d{1,2})?$/
@@ -18,9 +19,21 @@ const percent = (msg: string) =>
     .refine((v) => TWO_DP.test(v) && Number(v) <= 100, msg)
     .transform(canonical2dp)
 
+// Column limits: quantity numeric(9,2), money numeric(12,2).
+const MAX_QUANTITY = 9999999.99
+const MAX_AMOUNT = 9999999999.99
+const AMOUNT_TOO_LARGE = 'Amount is too large.'
+
+/** parseMoney, but a well-formed amount above the column limit gets its own message. */
+function parseBoundedMoney(v: string): Result<string> {
+  const cleaned = v.trim().replace(/,/g, '')
+  if (TWO_DP.test(cleaned) && Number(cleaned) > MAX_AMOUNT) return fail(AMOUNT_TOO_LARGE)
+  return parseMoney(v)
+}
+
 const money = () =>
   z.string().transform((v, ctx) => {
-    const r = parseMoney(v)
+    const r = parseBoundedMoney(v)
     if (!r.ok) {
       ctx.addIssue({ code: 'custom', message: r.error })
       return z.NEVER
@@ -74,6 +87,7 @@ export const manualLineSchema = z.object({
     .string()
     .trim()
     .refine((v) => TWO_DP.test(v) && Number(v) > 0, 'Enter a quantity above 0.')
+    .refine((v) => !TWO_DP.test(v) || Number(v) <= MAX_QUANTITY, 'Quantity is too large.')
     .transform(canonical2dp),
   unitPrice: money(),
 })
@@ -98,7 +112,7 @@ export const discountSchema = z
       }
       return { type: v.type, value: p.data, label: v.label }
     }
-    const m = parseMoney(v.value)
+    const m = parseBoundedMoney(v.value)
     if (!m.ok) {
       ctx.addIssue({ code: 'custom', path: ['value'], message: m.error })
       return z.NEVER
