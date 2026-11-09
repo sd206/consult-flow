@@ -64,6 +64,23 @@ describe('validateAttachment', () => {
   })
 })
 
+describe('validateAttachment declared size mismatch', () => {
+  it('uses the real buffer length for the size limit', () => {
+    const big = new Uint8Array(MAX_ATTACHMENT_BYTES + 1)
+    big.set(PDF)
+    expect(validateAttachment({ name: 'a.pdf', type: 'application/pdf', size: 1, bytes: big })).toEqual({
+      ok: false,
+      error: SIZE_MSG,
+    })
+  })
+
+  it('treats empty bytes as empty whatever size is declared', () => {
+    expect(
+      validateAttachment({ name: 'a.pdf', type: 'application/pdf', size: 100, bytes: new Uint8Array(0) }),
+    ).toEqual({ ok: false, error: 'That file is empty.' })
+  })
+})
+
 describe('displayFileName', () => {
   it('strips path parts and control characters', () => {
     const out = displayFileName('../../etc/pass\u0000wd.pdf')

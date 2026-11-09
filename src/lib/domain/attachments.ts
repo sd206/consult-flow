@@ -35,8 +35,11 @@ export function validateAttachment(file: {
   size: number
   bytes: Uint8Array
 }): Result<AttachmentInfo> {
-  if (file.size <= 0) return fail('That file is empty.')
-  if (file.size > MAX_ATTACHMENT_BYTES) return fail('Each file must be 10 MB or smaller.')
+  // The buffer is what gets stored, so its real length counts, not just the declared size.
+  if (file.size <= 0 || file.bytes.length === 0) return fail('That file is empty.')
+  if (Math.max(file.size, file.bytes.length) > MAX_ATTACHMENT_BYTES) {
+    return fail('Each file must be 10 MB or smaller.')
+  }
   const info = detect(file.bytes)
   if (!info) return fail('Only PDF, PNG, JPEG or HEIC files can be attached.')
   return ok(info)
