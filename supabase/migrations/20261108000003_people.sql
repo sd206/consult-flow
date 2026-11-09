@@ -35,9 +35,14 @@ create table public.consultants (
   constraint consultants_firm_id_id_key unique (firm_id, id),
   constraint consultants_vendor_required_chk check ((type = 'vendor') = (vendor_id is not null)),
   constraint consultants_vendor_fk foreign key (firm_id, vendor_id)
-    references public.vendors (firm_id, id) on delete restrict
+    references public.vendors (firm_id, id) on delete restrict,
+  -- login link must be a member of the same firm; removing the member clears the link
+  constraint consultants_member_fk foreign key (firm_id, user_id)
+    references public.firm_members (firm_id, user_id) on delete set null (user_id)
 );
 create unique index consultants_firm_email_key on public.consultants (firm_id, lower(email));
+create unique index consultants_firm_user_key on public.consultants (firm_id, user_id)
+  where user_id is not null;
 create index consultants_vendor_idx on public.consultants (firm_id, vendor_id);
 create index consultants_user_id_idx on public.consultants (user_id);
 
@@ -93,7 +98,7 @@ create policy vendors_delete on public.vendors
 -- consultants: admin/manager manage; a consultant user also reads their own row
 create policy consultants_select on public.consultants
   for select to authenticated
-  using (public.has_role(firm_id, '{admin,manager}') or user_id = auth.uid());
+  using (public.has_role(firm_id, '{admin,manager}') or (user_id = auth.uid() and public.is_member(firm_id)));
 create policy consultants_insert on public.consultants
   for insert to authenticated with check (public.has_role(firm_id, '{admin,manager}'));
 create policy consultants_update on public.consultants

@@ -88,6 +88,12 @@ isOneToOne: false
       referencedRelation: "firms"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "consultants_member_fk"
+      columns: ["firm_id","user_id"]
+isOneToOne: false
+      referencedRelation: "firm_members"
+      referencedColumns: ["firm_id","user_id"]
+    },{
       foreignKeyName: "consultants_user_id_fkey"
       columns: ["user_id"]
 isOneToOne: false
