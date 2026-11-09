@@ -43,6 +43,64 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"consultant_cost_rates": {
+                  Row: {
+                    "consultant_id": string,"created_at": string,"created_by": string | null,"effective_from": string,"firm_id": string,"hourly_cost": number,"id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "consultant_id": string,"created_at"?: string,"created_by"?: string | null,"effective_from": string,"firm_id": string,"hourly_cost": number,"id"?: string,"updated_at"?: string
+                  }
+                  Update: {
+                    "consultant_id"?: string,"created_at"?: string,"created_by"?: string | null,"effective_from"?: string,"firm_id"?: string,"hourly_cost"?: number,"id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "consultant_cost_rates_consultant_fk"
+      columns: ["firm_id","consultant_id"]
+isOneToOne: false
+      referencedRelation: "consultants"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "consultant_cost_rates_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"consultants": {
+                  Row: {
+                    "active": boolean,"created_at": string,"created_by": string | null,"email": string,"firm_id": string,"id": string,"name": string,"type": Database["public"]['Enums']["consultant_type"],"updated_at": string,"user_id": string | null,"vendor_id": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"email": string,"firm_id": string,"id"?: string,"name": string,"type": Database["public"]['Enums']["consultant_type"],"updated_at"?: string,"user_id"?: string | null,"vendor_id"?: string | null
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"email"?: string,"firm_id"?: string,"id"?: string,"name"?: string,"type"?: Database["public"]['Enums']["consultant_type"],"updated_at"?: string,"user_id"?: string | null,"vendor_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "consultants_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "consultants_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["user_id"]
+    },{
+      foreignKeyName: "consultants_vendor_fk"
+      columns: ["firm_id","vendor_id"]
+isOneToOne: false
+      referencedRelation: "vendors"
+      referencedColumns: ["firm_id","id"]
+    }
+                  ]
                 },"firm_members": {
                   Row: {
                     "created_at": string,"created_by": string | null,"firm_id": string,"id": string,"role": Database["public"]['Enums']["firm_role"],"updated_at": string,"user_id": string
@@ -97,6 +155,26 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"vendors": {
+                  Row: {
+                    "address": string | null,"contact_name": string | null,"created_at": string,"created_by": string | null,"email": string | null,"firm_id": string,"id": string,"name": string,"phone": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "address"?: string | null,"contact_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"email"?: string | null,"firm_id": string,"id"?: string,"name": string,"phone"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "address"?: string | null,"contact_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"email"?: string | null,"firm_id"?: string,"id"?: string,"name"?: string,"phone"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "vendors_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -119,7 +197,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "firm_role": "admin"|"manager"|"consultant"
+            "consultant_type": "employee"|"independent"|"vendor","firm_role": "admin"|"manager"|"consultant"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -239,7 +317,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "firm_role": ["admin", "manager", "consultant"]
+            "consultant_type": ["employee", "independent", "vendor"],"firm_role": ["admin", "manager", "consultant"]
           }
         }
 } as const
