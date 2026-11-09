@@ -138,6 +138,8 @@ Snapshots: on issue, the client billing details and firm header are copied onto 
 2. `amount_paid` and status recompute: `partly_paid` if 0 < paid < total, `paid` if paid = total.
 3. A payment that would make paid exceed total is rejected.
 4. Deleting a payment recomputes status and is audit-logged.
+5. A payment's date, method, reference, notes and attachments can be edited later; its amount cannot (delete and re-record to change it). Admins and Managers may record, edit and delete payments.
+6. The Unpaid Invoices list shows each issued or partly paid invoice with its balance due and "Overdue by N days" (days past the due date, UTC), filterable by client, plus balance totals by age: not yet due, 1–30, 31–60, 61–90 and over 90 days overdue.
 
 ### 5.4 Expenses
 Manager enters an expense with optional client/project and attaches receipts. Expenses list filters by date, category, client, project.
