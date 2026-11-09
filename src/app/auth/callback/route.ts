@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { safeNext } from '@/lib/auth/safe-next'
+import { postLoginPath } from '@/lib/auth/post-login'
 import { createServerDb } from '@/lib/supabase/server'
 
+/** PKCE code exchange (links whose verifier lives in this browser). Email links use /auth/confirm. */
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
   const code = searchParams.get('code')
@@ -15,8 +16,5 @@ export async function GET(request: NextRequest) {
   }
 
   const { data } = await db.auth.getUser()
-  if (data.user?.user_metadata?.password_set !== true) {
-    return NextResponse.redirect(`${origin}/auth/set-password`)
-  }
-  return NextResponse.redirect(`${origin}${safeNext(searchParams.get('next'))}`)
+  return NextResponse.redirect(`${origin}${postLoginPath(data.user, searchParams.get('next'))}`)
 }
