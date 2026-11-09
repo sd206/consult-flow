@@ -117,6 +117,9 @@ Snapshots: on issue, the client billing details and firm header are copied onto 
 1. Consultant opens a week: a grid of their active assigned projects (rows) × days (columns); each cell holds hours and an optional note. Save as draft any time.
 2. Submit → status `submitted`; entries become read-only to the consultant.
 3. Manager reviews a queue of submitted timesheets; approve (snapshots rates) or reject with a comment (returns to `draft`-editable state with the comment visible).
+4. Time can be entered for the current week and past weeks only, never a future week. "Today" is the UTC date until firms get a time zone setting.
+5. Admins and Managers may approve their own timesheets; the audit log records who decided.
+6. Managers see a week status list: every active consultant with their timesheet status for that week (not started, draft, submitted, approved, rejected) and total hours.
 
 ### 5.2 Invoice creation
 1. Manager selects client, period (start/end), and template.
