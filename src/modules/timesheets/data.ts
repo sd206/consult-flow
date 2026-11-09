@@ -55,7 +55,6 @@ export type ReviewTimesheet = Omit<TimesheetWeek, 'timesheetId' | 'entries' | 'e
   timesheetId: string
   entries: ReviewEntry[]
   submittedAt: string | null
-  decidedAt: string | null
 }
 
 type NameJoin = { name: string } | { name: string }[] | null
@@ -88,7 +87,7 @@ export async function getMyConsultant(
   return ok(data ? { id: data.id as string, name: data.name as string } : null)
 }
 
-type ProjectLookupRow = { id: string; name: string; code: string | null; clients: NameJoin }
+type TimesheetProjectRow = { project_id: string; project_name: string; project_code: string | null; client_name: string }
 
 export async function getTimesheetWeek(
   db: SupabaseClient,
@@ -153,22 +152,19 @@ export async function getTimesheetWeek(
 
   // Projects with hours but no assignment cover this week still show, read-only in effect (no active days).
   const known = new Set(projects.map((p) => p.projectId))
+  // Names come from timesheet_projects: consultants can't read `projects` directly.
   const missing = [...new Set(entries.map((e) => e.projectId))].filter((id) => !known.has(id))
-  if (missing.length > 0) {
-    const { data: pRows, error: lErr } = await db
-      .from('projects')
-      .select('id, name, code, clients(name)')
-      .eq('firm_id', firmId)
-      .in('id', missing)
+  if (ts && missing.length > 0) {
+    const { data: pRows, error: lErr } = await db.rpc('timesheet_projects', { p_timesheet: ts.id as string })
     if (lErr) return fail(mapDbError(lErr))
-    const found = new Map(((pRows ?? []) as unknown as ProjectLookupRow[]).map((p) => [p.id, p]))
+    const found = new Map(((pRows ?? []) as TimesheetProjectRow[]).map((p) => [p.project_id, p]))
     for (const id of missing) {
       const p = found.get(id)
       projects.push({
         projectId: id,
-        projectName: p?.name ?? 'Unknown project',
-        projectCode: p?.code ?? null,
-        clientName: p ? joinName(p.clients) : '',
+        projectName: p?.project_name ?? 'Unknown project',
+        projectCode: p?.project_code ?? null,
+        clientName: p?.client_name ?? '',
         activeDays: [],
       })
     }
@@ -234,7 +230,7 @@ export async function rejectTimesheet(
   return ok(undefined)
 }
 
-/** Total hours per timesheet id, read from time_entries (managers only). */
+/** Total hours per timesheet id, summed in SQL by timesheet_totals (managers only). */
 async function totalsFor(
   db: SupabaseClient,
   firmId: string,
@@ -242,19 +238,11 @@ async function totalsFor(
 ): Promise<Result<Map<string, string>>> {
   const totals = new Map<string, string>()
   if (timesheetIds.length === 0) return ok(totals)
-  const { data, error } = await db
-    .from('time_entries')
-    .select('timesheet_id, hours:hours::text')
-    .eq('firm_id', firmId)
-    .in('timesheet_id', timesheetIds)
+  const { data, error } = await db.rpc('timesheet_totals', { p_firm: firmId, p_ids: timesheetIds })
   if (error) return fail(mapDbError(error))
-  const grouped = new Map<string, string[]>()
-  for (const r of (data ?? []) as unknown as { timesheet_id: string; hours: string }[]) {
-    const list = grouped.get(r.timesheet_id) ?? []
-    list.push(r.hours)
-    grouped.set(r.timesheet_id, list)
+  for (const r of (data ?? []) as { timesheet_id: string; total_hours: string }[]) {
+    totals.set(r.timesheet_id, r.total_hours)
   }
-  for (const [id, hours] of grouped) totals.set(id, sumHours(hours))
   return ok(totals)
 }
 
@@ -337,7 +325,7 @@ export async function getTimesheetForReview(
 ): Promise<Result<ReviewTimesheet>> {
   const { data: ts, error } = await db
     .from('timesheets')
-    .select('id, consultant_id, week_start, status, submitted_at, decided_at, decision_comment, consultants(name)')
+    .select('id, consultant_id, week_start, status, submitted_at, decision_comment, consultants(name)')
     .eq('firm_id', firmId)
     .eq('id', timesheetId)
     .maybeSingle()
@@ -349,7 +337,6 @@ export async function getTimesheetForReview(
     week_start: string
     status: TimesheetStatus
     submitted_at: string | null
-    decided_at: string | null
     decision_comment: string | null
     consultants: NameJoin
   }
@@ -387,6 +374,5 @@ export async function getTimesheetForReview(
     entries,
     totalHours: sumHours(entries.map((e) => e.hours)),
     submittedAt: t.submitted_at,
-    decidedAt: t.decided_at,
   })
 }

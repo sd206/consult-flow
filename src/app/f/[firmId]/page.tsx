@@ -56,7 +56,9 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
                   Awaiting approval
                 </Link>
               </dt>
-              <dd className="text-2xl font-semibold">{summary.data.awaitingApproval}</dd>
+              <dd className="text-2xl font-semibold" data-testid="awaiting-approval-count">
+                {summary.data.awaitingApproval}
+              </dd>
             </div>
           </dl>
           <p className="mt-4 text-sm">

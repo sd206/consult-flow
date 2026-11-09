@@ -64,6 +64,7 @@ describe('mapDbError', () => {
     ['DAY_OVER_24', "A day can't have more than 24 hours in total."],
     ['time_entries_hours_chk', 'Enter hours between 0.01 and 24, up to 2 decimal places.'],
     ['time_entries_cell_key', 'That project already has hours on that day.'],
+    ['time_entries_note_len_chk', 'Keep notes to 500 characters or fewer.'],
     ['COST_RATE_MISSING', 'This consultant has no cost rate for a day worked. Add a cost rate starting on or before that day, then approve.'],
     ['REJECT_COMMENT_REQUIRED', 'Add a comment saying what needs to change.'],
     ['CONSULTANT_NOT_FOUND', 'Consultant not found.'],

@@ -146,8 +146,11 @@ describe('core tenancy RLS', () => {
     const a = await newFirm('A')
     const b = await newFirm('B')
     const owner = await signIn('owner@local.test', 'owner-password-123')
-    const { data } = await owner.db.rpc('platform_list_firms')
+    // Filter server-side: the full list is ordered oldest first and capped at max_rows.
+    const { data, error } = await owner.db.rpc('platform_list_firms').in('id', [a.firmId, b.firmId])
+    expect(error).toBeNull()
     const ids = (data as { id: string }[]).map((r) => r.id)
+    expect(ids).toHaveLength(2)
     expect(ids).toContain(a.firmId)
     expect(ids).toContain(b.firmId)
     const { data: firms } = await owner.db.from('firms').select('id')

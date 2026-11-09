@@ -72,9 +72,10 @@ describe('createFirmWithAdmin', () => {
       REDIRECT,
     )
     expect(res.ok).toBe(true)
-    const { data, error } = await owner.db.rpc('platform_list_firms')
+    // Filter server-side: the full list is ordered oldest first and capped at max_rows.
+    const { data, error } = await owner.db.rpc('platform_list_firms').eq('name', name)
     expect(error).toBeNull()
-    expect(data?.some((f: { name: string }) => f.name === name)).toBe(true)
+    expect((data as { name: string }[]).map((f) => f.name)).toEqual([name])
   })
 })
 

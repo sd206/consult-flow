@@ -285,7 +285,7 @@ test('manager dashboard shows the awaiting approval count and links to timesheet
   await page.goto(`/f/${f.firmId}`)
   const card = page.getByTestId('awaiting-approval')
   await expect(card).toContainText('Awaiting approval')
-  await expect(card).toContainText('1')
+  await expect(card.getByTestId('awaiting-approval-count')).toHaveText('1')
   await card.getByRole('link', { name: 'Awaiting approval' }).click()
   await expect(page).toHaveURL(new RegExp(`/f/${f.firmId}/timesheets$`))
 })

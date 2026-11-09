@@ -383,6 +383,16 @@ isOneToOne: false
               "hours": string,"id": string,"note": string,"project_id": string,"work_date": string
             }[]
                            },
+"timesheet_projects":
+{ Args: { "p_timesheet": string }; Returns: {
+              "client_name": string,"project_code": string,"project_id": string,"project_name": string
+            }[]
+                           },
+"timesheet_totals":
+{ Args: { "p_firm": string,"p_ids": (string)[] }; Returns: {
+              "timesheet_id": string,"total_hours": string
+            }[]
+                           },
 "week_projects":
 { Args: { "p_consultant": string,"p_firm": string,"p_week_start": string }; Returns: {
               "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string

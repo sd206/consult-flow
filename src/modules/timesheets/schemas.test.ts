@@ -38,6 +38,6 @@ describe('parseWeekForm', () => {
 
   it('rejects notes over 500 characters', () => {
     const r = parseWeekForm(form({ [`h:P:${MON}`]: '1', [`n:P:${MON}`]: 'a'.repeat(501) }), cells)
-    expect(errorsOf(r)[`n:P:${MON}`]).toBe('Keep notes under 500 characters.')
+    expect(errorsOf(r)[`n:P:${MON}`]).toBe('Keep notes to 500 characters or fewer.')
   })
 })

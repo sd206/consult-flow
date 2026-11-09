@@ -204,6 +204,19 @@ describe('timesheets db', () => {
     }
   })
 
+  it('note length capped at 500 characters', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const long = await save(f.consultant, f.firmId, fx.consultantId, [
+      { projectId: fx.projectId, workDate: MON, hours: '1', note: 'a'.repeat(501) },
+    ])
+    expect(text(long.error)).toContain('time_entries_note_len_chk')
+    const max = await save(f.consultant, f.firmId, fx.consultantId, [
+      { projectId: fx.projectId, workDate: MON, hours: '1', note: 'a'.repeat(500) },
+    ])
+    expect(max.error).toBeNull()
+  })
+
   it('locked after submit', async () => {
     const f = await newFirm()
     const fx = await seedTimesheetFixture(f)
@@ -591,7 +604,50 @@ describe('timesheet workflow', () => {
     ])
     expect(edit.error).toBeNull()
     expect((await submit(f.consultant, id)).error).toBeNull()
-    expect((await tsOf(id)).status).toBe('submitted')
+    const re = await tsOf(id)
+    expect(re.status).toBe('submitted')
+    expect(re.decided_by).toBeNull()
+    expect(re.decided_at).toBeNull()
+    expect(re.decision_comment).toBeNull()
+  })
+
+  it('assignment removed after submit: approve fails with NO_ASSIGNMENT', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx, [MON, TUE])
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    // Assignment now ends before Tuesday, so Tuesday is uncovered.
+    const { error: uErr } = await adminDb()
+      .from('project_assignments')
+      .update({ effective_to: MON })
+      .eq('id', fx.assignmentId)
+    expect(uErr).toBeNull()
+    const { error } = await approve(f.manager, id)
+    expect(text(error)).toContain('NO_ASSIGNMENT')
+    const ts = await tsOf(id)
+    expect(ts.status).toBe('submitted')
+    expect(ts.decided_by).toBeNull()
+    for (const s of await snapsOf(id)) {
+      expect(s.client_rate_snapshot).toBeNull()
+      expect(s.cost_rate_snapshot).toBeNull()
+    }
+  })
+
+  it('timesheet_totals: managers only, scoped to the firm', async () => {
+    const f = await newFirm()
+    const g = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx, [MON, TUE])
+    const totals = (u: TestUser, firm: string) =>
+      u.db.rpc('timesheet_totals', { p_firm: firm, p_ids: [id] })
+    const mine = await totals(f.manager, f.firmId)
+    expect(mine.error).toBeNull()
+    expect(mine.data).toEqual([{ timesheet_id: id, total_hours: '16.00' }])
+    expect((await totals(f.consultant, f.firmId)).error?.code).toBe('42501')
+    expect((await totals(g.manager, f.firmId)).error?.code).toBe('42501')
+    const other = await totals(g.manager, g.firmId)
+    expect(other.error).toBeNull()
+    expect(other.data).toEqual([])
   })
 
   it('approve from draft', async () => {

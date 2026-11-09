@@ -16,7 +16,7 @@ export function parseWeekForm(
     const nKey = `n:${projectId}:${workDate}`
     const rawHours = str(formData, hKey).trim()
     const note = str(formData, nKey).trim()
-    if (note.length > NOTE_MAX) fieldErrors[nKey] = 'Keep notes under 500 characters.'
+    if (note.length > NOTE_MAX) fieldErrors[nKey] = 'Keep notes to 500 characters or fewer.'
     if (rawHours === '') {
       if (note && !fieldErrors[nKey]) fieldErrors[nKey] = 'Add hours for this note.'
       continue

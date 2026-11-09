@@ -314,7 +314,7 @@ describe('projects and assignments', () => {
     const a = await addAssignment(f.manager.db, f.firmId, {
       projectId: s.projectId,
       consultantId: s.consultantId,
-      clientRate: '180',
+      clientRate: '187.43',
       effectiveFrom: '2026-01-01',
     })
     expect(a.ok).toBe(true)
@@ -323,7 +323,7 @@ describe('projects and assignments', () => {
     if (!mine.ok) return
     expect(mine.data).toHaveLength(1)
     expect(mine.data[0]).toMatchObject({ projectId: s.projectId, effectiveFrom: '2026-01-01' })
-    expect(JSON.stringify(mine.data)).not.toContain('180')
+    expect(JSON.stringify(mine.data)).not.toContain('187.43')
   })
 
   it('listMyProjects shows one row per project across back-to-back rate periods', async () => {
