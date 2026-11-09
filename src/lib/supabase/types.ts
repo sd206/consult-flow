@@ -332,6 +332,9 @@ isOneToOne: false
             "add_firm_member":
 { Args: { "p_firm": string,"p_role": Database["public"]['Enums']["firm_role"],"p_user": string }; Returns: string
                            },
+"approve_timesheet":
+{ Args: { "p_timesheet": string }; Returns: undefined
+                           },
 "can_edit_consultant_time":
 { Args: { "p_consultant": string,"p_firm": string }; Returns: boolean
                            },
@@ -360,11 +363,20 @@ isOneToOne: false
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
             }[]
                            },
+"reject_timesheet":
+{ Args: { "p_comment": string,"p_timesheet": string }; Returns: undefined
+                           },
+"reopen_timesheet":
+{ Args: { "p_timesheet": string }; Returns: undefined
+                           },
 "save_timesheet_week":
 { Args: { "p_consultant": string,"p_entries": Json,"p_firm": string,"p_week_start": string }; Returns: string
                            },
 "storage_firm_id":
 { Args: { "p_name": string }; Returns: string
+                           },
+"submit_timesheet":
+{ Args: { "p_timesheet": string }; Returns: undefined
                            },
 "timesheet_entries":
 { Args: { "p_timesheet": string }; Returns: {

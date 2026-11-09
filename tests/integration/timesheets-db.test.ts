@@ -374,3 +374,326 @@ describe('timesheets db', () => {
     }
   })
 })
+
+type SnapRow = {
+  work_date: string
+  client_rate_snapshot: string | null
+  cost_rate_snapshot: string | null
+}
+type TsRow = {
+  status: string
+  submitted_at: string | null
+  decided_by: string | null
+  decided_at: string | null
+  decision_comment: string | null
+}
+
+async function tsOf(id: string): Promise<TsRow> {
+  const { data, error } = await adminDb()
+    .from('timesheets')
+    .select('status, submitted_at, decided_by, decided_at, decision_comment')
+    .eq('id', id)
+    .single()
+  expect(error).toBeNull()
+  return data as TsRow
+}
+
+async function snapsOf(id: string): Promise<SnapRow[]> {
+  const { data, error } = await adminDb()
+    .from('time_entries')
+    .select('work_date, client_rate_snapshot::text, cost_rate_snapshot::text')
+    .eq('timesheet_id', id)
+    .order('work_date')
+  expect(error).toBeNull()
+  return data as SnapRow[]
+}
+
+const submit = (u: TestUser, id: string) => u.db.rpc('submit_timesheet', { p_timesheet: id })
+const approve = (u: TestUser, id: string) => u.db.rpc('approve_timesheet', { p_timesheet: id })
+const reject = (u: TestUser, id: string, comment: string | null) =>
+  u.db.rpc('reject_timesheet', { p_timesheet: id, p_comment: comment })
+const reopen = (u: TestUser, id: string) => u.db.rpc('reopen_timesheet', { p_timesheet: id })
+
+async function savedWeek(
+  f: Firm,
+  fx: { consultantId: string; projectId: string },
+  days = [MON, TUE],
+): Promise<string> {
+  const { data, error } = await save(
+    f.consultant,
+    f.firmId,
+    fx.consultantId,
+    days.map((d) => ({ projectId: fx.projectId, workDate: d, hours: '8', note: null })),
+  )
+  expect(error).toBeNull()
+  return data as string
+}
+
+describe('timesheet workflow', () => {
+  it('full cycle', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx)
+
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    const sub = await tsOf(id)
+    expect(sub.status).toBe('submitted')
+    expect(sub.submitted_at).not.toBeNull()
+
+    const locked = await save(f.consultant, f.firmId, fx.consultantId, [])
+    expect(text(locked.error)).toContain('TIMESHEET_LOCKED')
+
+    expect((await approve(f.manager, id)).error).toBeNull()
+    const ap = await tsOf(id)
+    expect(ap.status).toBe('approved')
+    expect(ap.decided_by).toBe(f.manager.id)
+    expect(ap.decided_at).not.toBeNull()
+    const snaps = await snapsOf(id)
+    expect(snaps).toHaveLength(2)
+    for (const s of snaps) {
+      expect(s.client_rate_snapshot).toBe('150.00')
+      expect(s.cost_rate_snapshot).toBe('90.00')
+    }
+
+    const { data: audit, error: aErr } = await adminDb()
+      .from('audit_log')
+      .select('action')
+      .eq('entity_type', 'timesheets')
+      .eq('entity_id', id)
+      .eq('action', 'update')
+    expect(aErr).toBeNull()
+    expect((audit ?? []).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('rate change mid-week', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const rc = await f.manager.db.rpc('change_client_rate', {
+      p_assignment: fx.assignmentId,
+      p_rate: 175,
+      p_from: '2026-10-07',
+    })
+    expect(rc.error).toBeNull()
+    const id = await savedWeek(f, fx, [MON, WED])
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    expect((await approve(f.manager, id)).error).toBeNull()
+    expect((await snapsOf(id)).map((s) => [s.work_date, s.client_rate_snapshot])).toEqual([
+      [MON, '150.00'],
+      [WED, '175.00'],
+    ])
+  })
+
+  it('cost rate missing', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f, { costFrom: '2026-10-06' })
+    // Tue has a cost rate, Mon does not: nothing may be snapshotted.
+    const id = await savedWeek(f, fx, [MON, TUE])
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    const { error } = await approve(f.manager, id)
+    expect(text(error)).toContain('COST_RATE_MISSING')
+    const ts = await tsOf(id)
+    expect(ts.status).toBe('submitted')
+    expect(ts.decided_by).toBeNull()
+    for (const s of await snapsOf(id)) {
+      expect(s.client_rate_snapshot).toBeNull()
+      expect(s.cost_rate_snapshot).toBeNull()
+    }
+  })
+
+  it('empty submit', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx, [])
+    const { error } = await submit(f.consultant, id)
+    expect(text(error)).toContain('TIMESHEET_EMPTY')
+    expect((await tsOf(id)).status).toBe('draft')
+  })
+
+  it('consultant cannot approve or reject own', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx)
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    expect((await approve(f.consultant, id)).error?.code).toBe('42501')
+    expect((await reject(f.consultant, id, 'no')).error?.code).toBe('42501')
+    expect((await tsOf(id)).status).toBe('submitted')
+  })
+
+  it('manager approves own timesheet', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const db = adminDb()
+    const { data: mc, error: mcErr } = await db
+      .from('consultants')
+      .insert({
+        firm_id: f.firmId,
+        name: 'Man Ager',
+        email: `m-${crypto.randomUUID()}@test.local`,
+        type: 'employee',
+        user_id: f.manager.id,
+      })
+      .select('id')
+      .single()
+    expect(mcErr).toBeNull()
+    const managerConsultantId = (mc as { id: string }).id
+    const { error: crErr } = await db.from('consultant_cost_rates').insert({
+      firm_id: f.firmId,
+      consultant_id: managerConsultantId,
+      hourly_cost: '120',
+      effective_from: '2026-01-01',
+    })
+    expect(crErr).toBeNull()
+    const { error: paErr } = await db.from('project_assignments').insert({
+      firm_id: f.firmId,
+      project_id: fx.projectId,
+      consultant_id: managerConsultantId,
+      client_rate: '250',
+      effective_from: '2026-01-01',
+    })
+    expect(paErr).toBeNull()
+
+    const { data, error } = await save(f.manager, f.firmId, managerConsultantId, [
+      { projectId: fx.projectId, workDate: MON, hours: '5', note: null },
+    ])
+    expect(error).toBeNull()
+    const id = data as string
+    expect((await submit(f.manager, id)).error).toBeNull()
+    expect((await approve(f.manager, id)).error).toBeNull()
+    const ts = await tsOf(id)
+    expect(ts.status).toBe('approved')
+    expect(ts.decided_by).toBe(f.manager.id)
+    expect((await snapsOf(id)).map((s) => [s.client_rate_snapshot, s.cost_rate_snapshot])).toEqual([
+      ['250.00', '120.00'],
+    ])
+  })
+
+  it('reject needs a comment', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx)
+    expect((await submit(f.consultant, id)).error).toBeNull()
+
+    for (const c of ['  ', null]) {
+      const { error } = await reject(f.manager, id, c)
+      expect(text(error)).toContain('REJECT_COMMENT_REQUIRED')
+    }
+    expect((await tsOf(id)).status).toBe('submitted')
+
+    expect((await reject(f.manager, id, '  Split by task ')).error).toBeNull()
+    const rj = await tsOf(id)
+    expect(rj.status).toBe('rejected')
+    expect(rj.decision_comment).toBe('Split by task')
+    expect(rj.decided_by).toBe(f.manager.id)
+    expect(rj.decided_at).not.toBeNull()
+
+    const edit = await save(f.consultant, f.firmId, fx.consultantId, [
+      { projectId: fx.projectId, workDate: WED, hours: '6', note: 'Task A' },
+    ])
+    expect(edit.error).toBeNull()
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    expect((await tsOf(id)).status).toBe('submitted')
+  })
+
+  it('approve from draft', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx)
+    expect(text((await approve(f.manager, id)).error)).toContain('TIMESHEET_STATE')
+    expect(text((await reject(f.manager, id, 'x')).error)).toContain('TIMESHEET_STATE')
+    expect(text((await reopen(f.manager, id)).error)).toContain('TIMESHEET_STATE')
+    expect((await tsOf(id)).status).toBe('draft')
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    expect(text((await submit(f.consultant, id)).error)).toContain('TIMESHEET_STATE')
+    expect((await tsOf(id)).status).toBe('submitted')
+  })
+
+  it('timesheet not found', async () => {
+    const f = await newFirm()
+    for (const r of [
+      await submit(f.manager, crypto.randomUUID()),
+      await approve(f.manager, crypto.randomUUID()),
+      await reject(f.manager, crypto.randomUUID(), 'x'),
+      await reopen(f.manager, crypto.randomUUID()),
+    ]) {
+      expect(text(r.error)).toContain('TIMESHEET_NOT_FOUND')
+    }
+  })
+
+  it('reopen', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx)
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    expect((await approve(f.manager, id)).error).toBeNull()
+    expect((await reopen(f.consultant, id)).error?.code).toBe('42501')
+
+    expect((await reopen(f.manager, id)).error).toBeNull()
+    expect(await tsOf(id)).toEqual({
+      status: 'draft',
+      submitted_at: null,
+      decided_by: null,
+      decided_at: null,
+      decision_comment: null,
+    })
+    const snaps = await snapsOf(id)
+    expect(snaps).toHaveLength(2)
+    for (const s of snaps) {
+      expect(s.client_rate_snapshot).toBeNull()
+      expect(s.cost_rate_snapshot).toBeNull()
+    }
+    const again = await save(f.consultant, f.firmId, fx.consultantId, [
+      { projectId: fx.projectId, workDate: THU, hours: '3', note: null },
+    ])
+    expect(again.error).toBeNull()
+  })
+
+  it('reopen invoiced', async () => {
+    const f = await newFirm()
+    const fx = await seedTimesheetFixture(f)
+    const id = await savedWeek(f, fx)
+    expect((await submit(f.consultant, id)).error).toBeNull()
+    expect((await approve(f.manager, id)).error).toBeNull()
+    const { error: upErr } = await adminDb()
+      .from('time_entries')
+      .update({ invoice_line_id: crypto.randomUUID() })
+      .eq('timesheet_id', id)
+      .eq('work_date', MON)
+    expect(upErr).toBeNull()
+
+    expect(text((await reopen(f.manager, id)).error)).toContain('TIMESHEET_INVOICED')
+    expect((await tsOf(id)).status).toBe('approved')
+    for (const s of await snapsOf(id)) {
+      expect(s.client_rate_snapshot).toBe('150.00')
+      expect(s.cost_rate_snapshot).toBe('90.00')
+    }
+  })
+
+  it('other firm cannot act', async () => {
+    const a = await newFirm('A')
+    const b = await newFirm('B')
+    const fx = await seedTimesheetFixture(a)
+    const id = await savedWeek(a, fx)
+
+    expect((await submit(b.admin, id)).error?.code).toBe('42501')
+    expect((await tsOf(id)).status).toBe('draft')
+
+    expect((await submit(a.consultant, id)).error).toBeNull()
+    expect((await approve(b.admin, id)).error?.code).toBe('42501')
+    expect((await reject(b.admin, id, 'nope')).error?.code).toBe('42501')
+    const sub = await tsOf(id)
+    expect(sub.status).toBe('submitted')
+    expect(sub.decided_by).toBeNull()
+    for (const s of await snapsOf(id)) {
+      expect(s.client_rate_snapshot).toBeNull()
+    }
+
+    expect((await approve(a.manager, id)).error).toBeNull()
+    expect((await reopen(b.admin, id)).error?.code).toBe('42501')
+    const ts = await tsOf(id)
+    expect(ts.status).toBe('approved')
+    expect(ts.decided_by).toBe(a.manager.id)
+    for (const s of await snapsOf(id)) {
+      expect(s.client_rate_snapshot).toBe('150.00')
+    }
+  })
+})
