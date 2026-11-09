@@ -96,7 +96,7 @@ Rules:
 - **invoices**: `client_id`, `template_id`, `number` (null while draft), `subject`, `period_start`, `period_end`, `issue_date`, `due_date`, `status` (`draft` | `issued` | `partly_paid` | `paid` | `void`), `subtotal`, `tax_percent`, `tax_amount`, `total`, `amount_paid`, `pdf_path`, client billing snapshot fields, firm header snapshot fields
 - **invoice_lines**: `invoice_id`, `consultant_id`, `project_id`, `description`, `hours`, `rate`, `amount`, `sort_order`
 
-Invoice number pattern tokens: `{PREFIX}` (literal set in settings), `{YYYY}`, `{YY}`, `{MM}`, `{SEQ:n}` (zero-padded to n digits). Example: `SRS-{YYYY}-{SEQ:4}` → `SRS-2026-0042`. The sequence is per firm, never resets in v1, and is incremented inside the issue transaction with a row lock on the firm. Numbers are unique per firm.
+Invoice number pattern: any prefix is literal text typed into the pattern itself (there is no separate prefix setting or `{PREFIX}` token). Tokens: `{YYYY}`, `{YY}`, `{MM}`, `{SEQ:n}` (zero-padded to n digits). Example: `SRS-{YYYY}-{SEQ:4}` → `SRS-2026-0042`. The sequence is per firm, never resets in v1, and is incremented inside the issue transaction with a row lock on the firm. Numbers are unique per firm.
 
 Snapshots: on issue, the client billing details and firm header are copied onto the invoice so later edits to client or firm do not change issued invoices.
 

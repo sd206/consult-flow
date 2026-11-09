@@ -50,20 +50,27 @@ npm run test:e2e    # Playwright; needs local Supabase running
 
 ## Hosted Supabase
 
-Make a hosted user a platform owner in the SQL editor:
+### Platform owner
+
+Sign-ups are disabled, so create the platform owner by hand: in the Supabase Dashboard go to Authentication → Users → Add user, enter the email and a password (at least 10 characters), and mark the email as confirmed. Then make that user a platform owner in the SQL editor:
 
 ```sql
 update public.profiles set is_platform_owner = true where email = 'you@example.com';
 ```
 
-The user must have signed up/in at least once so a profile row exists.
+The profile row is created automatically when the user is added.
 
-### Hosted Supabase settings
+### Email
+
+- Hosted Supabase's built-in email service only delivers to members of the Supabase project's team, and at a very low rate. Configure custom SMTP (Dashboard → Authentication → Emails → SMTP Settings) before inviting real users.
+- Invite, magic-link and password-recovery emails must link to `/auth/confirm` with a token hash, not the default links. Set the hosted templates to match `supabase/templates/invite.html`, `magic_link.html` and `recovery.html` (Dashboard → Authentication → Email Templates, or `npx supabase config push`, which pushes `supabase/config.toml` including the templates). With the default templates, invite links put the session in the URL fragment and sign-in fails with "That sign-in link is invalid or has expired."
+
+### Auth settings
 
 The hosted project must mirror the local `supabase/config.toml` auth settings:
 
 - Sign-ups disabled (`enable_signup = false`); users are added only by invitation.
 - Minimum password length 10 (`minimum_password_length = 10`).
-- Site URL set to the deployed app URL, and the redirect URL `<site URL>/auth/callback` added to the allowed redirect list.
+- Site URL set to the deployed app URL (the email templates build their links from it), and the redirect URLs `<site URL>/auth/callback` and `<site URL>/auth/confirm` added to the allowed redirect list.
 
 Also set `NEXT_PUBLIC_SITE_URL` to the deployed URL in the app's environment.

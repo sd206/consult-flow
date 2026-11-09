@@ -63,9 +63,10 @@ test('magic link for an unknown email shows neutral message and creates no user'
   await page.getByLabel('Email').fill(email)
   await page.getByRole('button', { name: 'Email me a link' }).click()
   await expect(page.getByRole('status')).toContainText('If that email has an account')
-  const { data, error } = await adminDb().auth.admin.listUsers({ perPage: 1000 })
+  // Every auth user gets a profile row (handle_new_user trigger), so look the email up directly.
+  const { data, error } = await adminDb().from('profiles').select('user_id').eq('email', email.toLowerCase())
   expect(error).toBeNull()
-  expect(data.users.some((u) => u.email === email)).toBe(false)
+  expect(data).toEqual([])
 })
 
 test('platform owner sees the Platform link on /', async ({ page }) => {
