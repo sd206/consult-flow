@@ -23,7 +23,7 @@ export default async function Home() {
       <h1 className="text-2xl font-semibold">Consulting Ops</h1>
       {isPlatformOwner && (
         <p className="mt-4">
-          <Link href="/platform" className="underline">
+          <Link href="/platform/firms" className="underline">
             Platform
           </Link>
         </p>

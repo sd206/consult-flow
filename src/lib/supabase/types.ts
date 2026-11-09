@@ -265,7 +265,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "has_role":
+            "create_firm_with_admin":
+{ Args: { "p_admin": string,"p_name": string }; Returns: string
+                           },
+"has_role":
 { Args: { "p_firm": string,"p_roles": (Database["public"]['Enums']["firm_role"])[] }; Returns: boolean
                            },
 "is_member":
