@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { adminDb, newFirm, newUser, type TestUser } from './helpers'
+import { insertDraftInvoiceLine } from './invoice-fixtures'
 import { FUTURE_WEEK, PAST_WEEK, seedTimesheetFixture } from './timesheet-fixtures'
 
 type Firm = Awaited<ReturnType<typeof newFirm>>
@@ -711,7 +712,7 @@ describe('timesheet workflow', () => {
     expect((await approve(f.manager, id)).error).toBeNull()
     const { error: upErr } = await adminDb()
       .from('time_entries')
-      .update({ invoice_line_id: crypto.randomUUID() })
+      .update({ invoice_line_id: await insertDraftInvoiceLine(f.firmId, fx.clientId) })
       .eq('timesheet_id', id)
       .eq('work_date', MON)
     expect(upErr).toBeNull()

@@ -167,6 +167,108 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"invoice_lines": {
+                  Row: {
+                    "amount": number,"consultant_id": string | null,"created_at": string,"created_by": string | null,"description": string,"firm_id": string,"id": string,"invoice_id": string,"kind": Database["public"]['Enums']["invoice_line_kind"],"project_id": string | null,"quantity": number,"sort_order": number,"unit_price": number,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"consultant_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"description": string,"firm_id": string,"id"?: string,"invoice_id": string,"kind": Database["public"]['Enums']["invoice_line_kind"],"project_id"?: string | null,"quantity": number,"sort_order"?: number,"unit_price": number,"updated_at"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"consultant_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string,"firm_id"?: string,"id"?: string,"invoice_id"?: string,"kind"?: Database["public"]['Enums']["invoice_line_kind"],"project_id"?: string | null,"quantity"?: number,"sort_order"?: number,"unit_price"?: number,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoice_lines_consultant_fk"
+      columns: ["firm_id","consultant_id"]
+isOneToOne: false
+      referencedRelation: "consultants"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "invoice_lines_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoice_lines_invoice_fk"
+      columns: ["firm_id","invoice_id"]
+isOneToOne: false
+      referencedRelation: "invoices"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "invoice_lines_project_fk"
+      columns: ["firm_id","project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["firm_id","id"]
+    }
+                  ]
+                },"invoice_templates": {
+                  Row: {
+                    "base_layout": Database["public"]['Enums']["invoice_layout"],"created_at": string,"created_by": string | null,"firm_id": string,"id": string,"is_default": boolean,"name": string,"options": NonNullable<Json>,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "base_layout"?: Database["public"]['Enums']["invoice_layout"],"created_at"?: string,"created_by"?: string | null,"firm_id": string,"id"?: string,"is_default"?: boolean,"name": string,"options"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Update: {
+                    "base_layout"?: Database["public"]['Enums']["invoice_layout"],"created_at"?: string,"created_by"?: string | null,"firm_id"?: string,"id"?: string,"is_default"?: boolean,"name"?: string,"options"?: NonNullable<Json>,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoice_templates_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"invoices": {
+                  Row: {
+                    "amount_paid": number,"bill_to_address": string | null,"bill_to_contact_name": string | null,"bill_to_email": string | null,"bill_to_name": string | null,"bill_to_phone": string | null,"client_id": string,"created_at": string,"created_by": string | null,"currency": string,"discount_amount": number,"discount_label": string | null,"discount_type": Database["public"]['Enums']["invoice_discount_type"],"discount_value": number,"due_date": string,"firm_id": string,"from_address": string | null,"from_contact_email": string | null,"from_contact_name": string | null,"from_contact_phone": string | null,"from_logo_path": string | null,"from_name": string | null,"id": string,"issue_date": string,"issued_at": string | null,"issued_by": string | null,"number": string | null,"pdf_path": string | null,"period_end": string,"period_start": string,"status": Database["public"]['Enums']["invoice_status"],"subject": string | null,"subtotal": number,"tax_amount": number,"tax_percent": number,"template_id": string,"total": number,"updated_at": string,"voided_at": string | null,"voided_by": string | null
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount_paid"?: number,"bill_to_address"?: string | null,"bill_to_contact_name"?: string | null,"bill_to_email"?: string | null,"bill_to_name"?: string | null,"bill_to_phone"?: string | null,"client_id": string,"created_at"?: string,"created_by"?: string | null,"currency": string,"discount_amount"?: number,"discount_label"?: string | null,"discount_type"?: Database["public"]['Enums']["invoice_discount_type"],"discount_value"?: number,"due_date": string,"firm_id": string,"from_address"?: string | null,"from_contact_email"?: string | null,"from_contact_name"?: string | null,"from_contact_phone"?: string | null,"from_logo_path"?: string | null,"from_name"?: string | null,"id"?: string,"issue_date": string,"issued_at"?: string | null,"issued_by"?: string | null,"number"?: string | null,"pdf_path"?: string | null,"period_end": string,"period_start": string,"status"?: Database["public"]['Enums']["invoice_status"],"subject"?: string | null,"subtotal"?: number,"tax_amount"?: number,"tax_percent"?: number,"template_id": string,"total"?: number,"updated_at"?: string,"voided_at"?: string | null,"voided_by"?: string | null
+                  }
+                  Update: {
+                    "amount_paid"?: number,"bill_to_address"?: string | null,"bill_to_contact_name"?: string | null,"bill_to_email"?: string | null,"bill_to_name"?: string | null,"bill_to_phone"?: string | null,"client_id"?: string,"created_at"?: string,"created_by"?: string | null,"currency"?: string,"discount_amount"?: number,"discount_label"?: string | null,"discount_type"?: Database["public"]['Enums']["invoice_discount_type"],"discount_value"?: number,"due_date"?: string,"firm_id"?: string,"from_address"?: string | null,"from_contact_email"?: string | null,"from_contact_name"?: string | null,"from_contact_phone"?: string | null,"from_logo_path"?: string | null,"from_name"?: string | null,"id"?: string,"issue_date"?: string,"issued_at"?: string | null,"issued_by"?: string | null,"number"?: string | null,"pdf_path"?: string | null,"period_end"?: string,"period_start"?: string,"status"?: Database["public"]['Enums']["invoice_status"],"subject"?: string | null,"subtotal"?: number,"tax_amount"?: number,"tax_percent"?: number,"template_id"?: string,"total"?: number,"updated_at"?: string,"voided_at"?: string | null,"voided_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "invoices_client_fk"
+      columns: ["firm_id","client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "invoices_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "invoices_issued_by_fkey"
+      columns: ["issued_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["user_id"]
+    },{
+      foreignKeyName: "invoices_template_fk"
+      columns: ["firm_id","template_id"]
+isOneToOne: false
+      referencedRelation: "invoice_templates"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "invoices_voided_by_fkey"
+      columns: ["voided_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["user_id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"display_name": string | null,"email": string,"is_platform_owner": boolean,"updated_at": string,"user_id": string
@@ -258,6 +360,12 @@ isOneToOne: false
       referencedRelation: "firms"
       referencedColumns: ["id"]
     },{
+      foreignKeyName: "time_entries_invoice_line_fk"
+      columns: ["firm_id","invoice_line_id"]
+isOneToOne: false
+      referencedRelation: "invoice_lines"
+      referencedColumns: ["firm_id","id"]
+    },{
       foreignKeyName: "time_entries_project_fk"
       columns: ["firm_id","project_id"]
 isOneToOne: false
@@ -344,6 +452,9 @@ isOneToOne: false
 "create_firm_with_admin":
 { Args: { "p_admin": string,"p_name": string }; Returns: string
                            },
+"format_invoice_number":
+{ Args: { "p_issue": string,"p_pattern": string,"p_seq": number }; Returns: string
+                           },
 "has_role":
 { Args: { "p_firm": string,"p_roles": (Database["public"]['Enums']["firm_role"])[] }; Returns: boolean
                            },
@@ -371,6 +482,9 @@ isOneToOne: false
                            },
 "save_timesheet_week":
 { Args: { "p_consultant": string,"p_entries": Json,"p_firm": string,"p_week_start": string }; Returns: string
+                           },
+"set_default_template":
+{ Args: { "p_template": string }; Returns: undefined
                            },
 "storage_firm_id":
 { Args: { "p_name": string }; Returns: string
@@ -400,7 +514,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "consultant_type": "employee"|"independent"|"vendor","firm_role": "admin"|"manager"|"consultant","project_status": "active"|"on_hold"|"closed","timesheet_status": "draft"|"submitted"|"approved"|"rejected"
+            "consultant_type": "employee"|"independent"|"vendor","firm_role": "admin"|"manager"|"consultant","invoice_discount_type": "none"|"percent"|"amount","invoice_layout": "classic"|"modern"|"compact","invoice_line_kind": "time"|"manual","invoice_status": "draft"|"issued"|"partly_paid"|"paid"|"void","project_status": "active"|"on_hold"|"closed","timesheet_status": "draft"|"submitted"|"approved"|"rejected"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -520,7 +634,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "consultant_type": ["employee", "independent", "vendor"],"firm_role": ["admin", "manager", "consultant"],"project_status": ["active", "on_hold", "closed"],"timesheet_status": ["draft", "submitted", "approved", "rejected"]
+            "consultant_type": ["employee", "independent", "vendor"],"firm_role": ["admin", "manager", "consultant"],"invoice_discount_type": ["none", "percent", "amount"],"invoice_layout": ["classic", "modern", "compact"],"invoice_line_kind": ["time", "manual"],"invoice_status": ["draft", "issued", "partly_paid", "paid", "void"],"project_status": ["active", "on_hold", "closed"],"timesheet_status": ["draft", "submitted", "approved", "rejected"]
           }
         }
 } as const
