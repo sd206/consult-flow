@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireFirmRole } from '@/lib/auth/context'
 import { fail, type Result } from '@/lib/result'
+import { siteUrl } from '@/lib/site-url'
 import { createAdminDb } from '@/lib/supabase/admin'
 import { changeMemberRole, inviteMember, removeMember } from './data'
 import { changeRoleSchema, inviteMemberSchema, removeMemberSchema } from './schemas'
@@ -32,7 +33,7 @@ export async function inviteMemberAction(
       createAdminDb(),
       firmId,
       parsed.data,
-      `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      `${siteUrl()}/auth/callback`,
     ),
   )
 }

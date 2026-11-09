@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { requireFirmRole, requireUser } from '@/lib/auth/context'
 import { fail, type Result } from '@/lib/result'
+import { siteUrl } from '@/lib/site-url'
 import { createAdminDb } from '@/lib/supabase/admin'
 import { createFirmWithAdmin, updateFirmSettings, uploadFirmLogo } from './data'
 import { createFirmSchema, firmSettingsSchema } from './schemas'
@@ -78,7 +79,7 @@ export async function createFirmAction(formData: FormData): Promise<Result<{ fir
   const result = await createFirmWithAdmin(
     createAdminDb(),
     parsed.data,
-    `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    `${siteUrl()}/auth/callback`,
   )
   if (result.ok) revalidatePath('/platform/firms')
   return result
