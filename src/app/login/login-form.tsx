@@ -42,15 +42,12 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
     setMessage(null)
     const { error: err } = await createBrowserDb().auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/auth/callback` },
     })
     setBusy(false)
-    if (err) {
-      console.error('signInWithOtp failed', err)
-      setError('We could not send the link. Please try again.')
-      return
-    }
-    setMessage('Check your email for a sign-in link.')
+    // Same message whether or not the account exists (no enumeration).
+    if (err) console.error('signInWithOtp failed', err)
+    setMessage('If that email has an account, a sign-in link is on its way.')
   }
 
   return (

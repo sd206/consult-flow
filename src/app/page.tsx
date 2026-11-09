@@ -16,7 +16,7 @@ export default async function Home() {
     return { id: m.firm_id, role: m.role, name: f?.name ?? 'Firm' }
   })
 
-  if (!error && firms.length === 1) redirect(`/f/${firms[0].id}`)
+  if (!error && !isPlatformOwner && firms.length === 1) redirect(`/f/${firms[0].id}`)
 
   return (
     <main className="mx-auto max-w-2xl p-8">

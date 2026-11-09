@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { newFirm, TEST_PASSWORD } from '../integration/helpers'
+import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 
 type Fixture = Awaited<ReturnType<typeof newFirm>>
 
@@ -8,10 +8,10 @@ const twoFirms = test.extend<{ a: Fixture; b: Fixture }>({
   b: async ({}, run) => run(await newFirm('Firm B')),
 })
 
-async function login(page: Page, email: string) {
+async function login(page: Page, email: string, password = TEST_PASSWORD) {
   await page.goto('/login')
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(TEST_PASSWORD)
+  await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
 }
 
@@ -48,4 +48,26 @@ twoFirms('other firm and manager-only pages are 404 for consultant', async ({ pa
 test('wrong password shows an alert', async ({ page }) => {
   await login(page, 'nobody@test.local')
   await expect(page.getByText('Email or password is incorrect.')).toBeVisible()
+})
+
+test('unauthenticated request to a path ending in an asset-like suffix still hits middleware', async ({ page }) => {
+  await page.goto('/f/00000000-0000-0000-0000-000000000000/xpng')
+  await expect(page).toHaveURL(/\/login$/)
+})
+
+test('magic link for an unknown email shows neutral message and creates no user', async ({ page }) => {
+  const email = `ghost-${crypto.randomUUID()}@test.local`
+  await page.goto('/login')
+  await page.getByLabel('Email').fill(email)
+  await page.getByRole('button', { name: 'Email me a link' }).click()
+  await expect(page.getByRole('status')).toContainText('If that email has an account')
+  const { data, error } = await adminDb().auth.admin.listUsers({ perPage: 1000 })
+  expect(error).toBeNull()
+  expect(data.users.some((u) => u.email === email)).toBe(false)
+})
+
+test('platform owner sees the Platform link on /', async ({ page }) => {
+  await login(page, 'owner@local.test', 'owner-password-123')
+  await expect(page.getByRole('link', { name: 'Platform' })).toBeVisible()
+  await expect(page).toHaveURL(/localhost:3000\/$/)
 })
