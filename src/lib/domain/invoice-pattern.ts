@@ -1,6 +1,6 @@
 import { fail, ok, type Result } from '../result'
 
-const TOKEN_RE = /\{(YYYY|YY|MM|SEQ:(\d+))\}|[A-Za-z0-9\-_/.]|(.)/g
+const TOKEN_RE = /\{(YYYY|YY|MM|SEQ:(\d+))\}|[A-Za-z0-9\-_/.]|([\s\S])/g
 
 export function validateInvoicePattern(pattern: string): Result<string> {
   if (pattern.length < 1 || pattern.length > 40) {
