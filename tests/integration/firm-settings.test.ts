@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { mapDbError } from '@/lib/db-errors'
 import { getFirm, updateFirmSettings, uploadFirmLogo } from '@/modules/firms/data'
 import type { FirmSettingsInput } from '@/modules/firms/schemas'
 import { adminDb, newFirm } from './helpers'
 
 const DENIED = "You don't have permission to do that."
-const LOGO_ERR = 'Logo must be a PNG, JPEG or SVG under 2 MB.'
+const LOGO_ERR = 'Logo must be a PNG or JPEG under 2 MB.'
 
 const settings = (over: Partial<FirmSettingsInput> = {}): FirmSettingsInput => ({
   name: 'Renamed Firm',
@@ -135,24 +136,18 @@ describe('uploadFirmLogo', () => {
     expect(r).toEqual({ ok: false, error: LOGO_ERR })
   })
 
-  it('rejects an SVG containing <script> or event-handler attributes', async () => {
+  it('rejects SVG logos, even clean ones', async () => {
     const f = await newFirm()
-    const a = await uploadFirmLogo(
+    const r = await uploadFirmLogo(
       f.admin.db,
       f.firmId,
       file(
         'x.svg',
         'image/svg+xml',
-        text('<svg xmlns="http://www.w3.org/2000/svg"><SCRIPT>alert(1)</SCRIPT></svg>'),
+        text('<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'),
       ),
     )
-    expect(a).toEqual({ ok: false, error: LOGO_ERR })
-    const b = await uploadFirmLogo(
-      f.admin.db,
-      f.firmId,
-      file('x.svg', 'image/svg+xml', text('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>')),
-    )
-    expect(b).toEqual({ ok: false, error: LOGO_ERR })
+    expect(r).toEqual({ ok: false, error: LOGO_ERR })
     expect(await logoObjects(f.firmId)).toEqual([])
   })
 
@@ -182,18 +177,22 @@ describe('uploadFirmLogo', () => {
     expect(row2?.logo_path).toBe(second.data.logoPath)
   })
 
-  it('accepts a clean SVG', async () => {
-    const f = await newFirm()
-    const r = await uploadFirmLogo(
-      f.admin.db,
-      f.firmId,
-      file(
-        'x.svg',
-        'image/svg+xml',
-        text('<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'),
-      ),
+  it("db rejects a logo_path outside the firm's own logo folder, naming the constraint", async () => {
+    const a = await newFirm('Path Firm A')
+    const b = await newFirm('Path Firm B')
+    const { error } = await a.admin.db
+      .from('firms')
+      .update({ logo_path: `firms/${b.firmId}/logo/x.png` })
+      .eq('id', a.firmId)
+    expect(error?.message).toContain('firms_logo_path_chk')
+    const { data } = await adminDb().from('firms').select('logo_path').eq('id', a.firmId).single()
+    expect(data?.logo_path).toBeNull()
+  })
+
+  it('mapDbError turns the logo_path constraint into a plain message', () => {
+    expect(mapDbError({ code: '23514', message: 'new row violates check constraint "firms_logo_path_chk"' })).toBe(
+      "That logo file doesn't belong to this firm.",
     )
-    expect(r.ok).toBe(true)
   })
 })
 
@@ -208,5 +207,12 @@ describe('getFirm', () => {
     if (!r.ok) return
     expect(r.data.name).toBe('Logo Firm')
     expect(r.data.logoUrl).toMatch(/^https?:\/\//)
+  })
+
+  it('returns default_tax_percent exactly as stored', async () => {
+    const f = await newFirm()
+    await adminDb().from('firms').update({ default_tax_percent: '8.50' }).eq('id', f.firmId)
+    const r = await getFirm(f.admin.db, f.firmId)
+    expect(r.ok && r.data.defaultTaxPercent).toBe('8.50')
   })
 })

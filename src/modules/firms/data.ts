@@ -31,7 +31,7 @@ export async function createFirmWithAdmin(
 
 const DENIED = "You don't have permission to do that."
 const BUCKET = 'firm-files'
-const LOGO_ERROR = 'Logo must be a PNG, JPEG or SVG under 2 MB.'
+const LOGO_ERROR = 'Logo must be a PNG or JPEG under 2 MB.'
 const MAX_LOGO_BYTES = 2 * 1024 * 1024
 
 export type Firm = {
@@ -50,7 +50,13 @@ export type Firm = {
 }
 
 export async function getFirm(db: SupabaseClient, firmId: string): Promise<Result<Firm>> {
-  const { data, error } = await db.from('firms').select('*').eq('id', firmId).maybeSingle()
+  const { data, error } = await db
+    .from('firms')
+    .select(
+      'id, name, address, contact_name, contact_email, contact_phone, currency, default_tax_percent::text, default_payment_terms_days, invoice_number_pattern, logo_path',
+    )
+    .eq('id', firmId)
+    .maybeSingle()
   if (error) return fail(mapDbError(error))
   if (!data) return fail('Firm not found.')
 
@@ -70,7 +76,7 @@ export async function getFirm(db: SupabaseClient, firmId: string): Promise<Resul
     contactEmail: (data.contact_email as string | null) ?? '',
     contactPhone: (data.contact_phone as string | null) ?? '',
     currency: data.currency as string,
-    defaultTaxPercent: String(data.default_tax_percent),
+    defaultTaxPercent: data.default_tax_percent as string,
     defaultPaymentTermsDays: data.default_payment_terms_days as number,
     invoiceNumberPattern: data.invoice_number_pattern as string,
     logoPath,
@@ -113,22 +119,18 @@ export type LogoFile = { name: string; type: string; size: number; bytes: ArrayB
 const LOGO_TYPES: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
-  'image/svg+xml': 'svg',
 }
 
 function startsWith(bytes: Uint8Array, sig: number[]): boolean {
   return sig.every((b, i) => bytes[i] === b)
 }
 
-/** Magic-byte check; SVGs must also be free of scripts and event-handler attributes. */
+/** Magic-byte check: the bytes must really be the declared PNG or JPEG. */
 function contentMatchesType(type: string, buffer: ArrayBuffer): boolean {
   const bytes = new Uint8Array(buffer)
-  if (type === 'image/png') return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47])
+  if (type === 'image/png') return startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
   if (type === 'image/jpeg') return startsWith(bytes, [0xff, 0xd8, 0xff])
-  const text = new TextDecoder('utf-8').decode(bytes).replace(/^﻿/, '').trimStart()
-  if (!/^(<svg|<\?xml)/i.test(text)) return false
-  if (/<script/i.test(text) || /\bon\w+\s*=/i.test(text) || /javascript:/i.test(text)) return false
-  return true
+  return false
 }
 
 export async function uploadFirmLogo(

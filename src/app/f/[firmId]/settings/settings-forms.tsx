@@ -31,15 +31,14 @@ export function LogoForm({ firmId, logoUrl }: { firmId: string; logoUrl: string 
   return (
     <form action={action} className="mt-3 flex flex-col gap-3">
       {logoUrl ? (
-        // Rendered only via <img> so SVG content can never execute in the page.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logoUrl} alt="Firm logo" className="max-h-24 max-w-xs self-start rounded border" />
       ) : (
         <p className="text-sm text-muted-foreground">No logo uploaded.</p>
       )}
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="logo-file">Logo file (PNG, JPEG or SVG, up to 2 MB)</Label>
-        <Input id="logo-file" name="logo" type="file" accept="image/png,image/jpeg,image/svg+xml" required />
+        <Label htmlFor="logo-file">Logo file (PNG or JPEG, up to 2 MB)</Label>
+        <Input id="logo-file" name="logo" type="file" accept="image/png,image/jpeg" required />
       </div>
       {state && !state.ok && (
         <p role="alert" className="text-sm text-destructive">
