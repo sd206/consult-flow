@@ -56,3 +56,20 @@ test('manager adds a vendor and a vendor consultant with a cost rate', async ({ 
   // Managers cannot invite (admin only).
   await expect(page.getByRole('button', { name: 'Invite to log in' })).toHaveCount(0)
 })
+
+test('admin "Invite to log in" links a consultant record to an existing member', async ({ page }) => {
+  const f = await newFirm('Link People Firm')
+  // Inserted directly so it starts unlinked; its email belongs to the firm's manager.
+  const { data: row } = await adminDb()
+    .from('consultants')
+    .insert({ firm_id: f.firmId, name: 'Manager Billing', email: f.manager.email, type: 'employee' })
+    .select('id')
+    .single()
+  await login(page, f.admin.email)
+  await page.goto(`/f/${f.firmId}/consultants/${row!.id}`)
+  await page.getByRole('button', { name: 'Invite to log in' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Linked to existing user.' })).toBeVisible()
+  await expect(page.getByText('That person is already a member of this firm.')).toHaveCount(0)
+  const { data } = await adminDb().from('consultants').select('user_id').eq('id', row!.id).single()
+  expect(data?.user_id).toBe(f.manager.id)
+})

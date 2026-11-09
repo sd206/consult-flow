@@ -3,18 +3,17 @@
 import { revalidatePath } from 'next/cache'
 import { requireFirmRole } from '@/lib/auth/context'
 import { fieldErrorsOf, type FormResult, str } from '@/lib/form'
-import { fail } from '@/lib/result'
 import { siteUrl } from '@/lib/site-url'
 import { createAdminDb } from '@/lib/supabase/admin'
-import { inviteMember } from '@/modules/members/data'
 import {
   addCostRate,
   createConsultant,
   deleteCostRate,
-  getConsultant,
+  linkOrInviteConsultant,
   setConsultantActive,
   updateConsultant,
 } from './data'
+import type { LoginOutcome } from './data'
 import { consultantCreateSchema, consultantUpdateSchema, costRateSchema } from './schemas'
 
 const MANAGERS = ['admin', 'manager'] as const
@@ -91,24 +90,22 @@ export async function deleteCostRateAction(
   return done(firmId, await deleteCostRate(db, firmId, rateId), consultantId)
 }
 
-/** Invite the consultant's email to log in. Only Admins can invite (enforced again in inviteMember). */
+/**
+ * Give the consultant a login: link to an existing firm member with the same email, or invite
+ * the email. Only Admins can do this (enforced again in inviteMember).
+ */
 export async function inviteConsultantAction(
   firmId: string,
   consultantId: string,
-): Promise<FormResult<{ invited: boolean }>> {
+): Promise<FormResult<{ outcome: LoginOutcome }>> {
   const { db } = await requireFirmRole(firmId, ['admin'])
-  const consultant = await getConsultant(db, firmId, consultantId)
-  if (!consultant.ok) return consultant
-  if (consultant.data.hasLogin) return fail('This consultant can already log in.')
-
-  const result = await inviteMember(
+  const result = await linkOrInviteConsultant(
     db,
     createAdminDb(),
     firmId,
-    { email: consultant.data.email, role: 'consultant' },
+    consultantId,
     `${siteUrl()}/auth/callback`,
   )
-  if (!result.ok) return result
-  revalidatePath(`/f/${firmId}/users`)
-  return done(firmId, { ok: true, data: { invited: result.data.invited } }, consultantId)
+  if (result.ok) revalidatePath(`/f/${firmId}/users`)
+  return done(firmId, result, consultantId)
 }

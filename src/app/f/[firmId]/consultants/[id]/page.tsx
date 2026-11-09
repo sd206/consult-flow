@@ -39,7 +39,7 @@ export default async function ConsultantPage({ params }: { params: Promise<{ fir
 
       <div className="mt-4 flex flex-wrap gap-4">
         <ActiveForm firmId={firmId} consultantId={c.id} active={c.active} />
-        {role === 'admin' && !c.hasLogin && <InviteForm firmId={firmId} consultantId={c.id} />}
+        {role === 'admin' && <InviteForm firmId={firmId} consultantId={c.id} hasLogin={c.hasLogin} />}
       </div>
 
       <h2 className="mt-8 text-lg font-medium">Details</h2>

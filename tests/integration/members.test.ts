@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adminDb, newFirm, newUser } from './helpers'
+import { adminDb, anonDb, newFirm, newUser } from './helpers'
 import { createFirmWithAdmin } from '@/modules/firms/data'
 import { changeMemberRole, inviteMember, listMembers, removeMember } from '@/modules/members/data'
 
@@ -153,17 +153,84 @@ describe('inviteMember', () => {
     expect(after?.user_id).toBe(target.id)
   })
 
-  it('does not link a consultant record when role is not consultant', async () => {
+  it('links a matching unlinked consultant record for any role (e.g. manager)', async () => {
     const a = await newFirm('A')
-    const target = await newUser('nolink')
+    const target = await newUser('mgrlink')
     const { data: c } = await adminDb()
       .from('consultants')
-      .insert({ firm_id: a.firmId, name: 'No Link', email: target.email, type: 'employee' })
+      .insert({ firm_id: a.firmId, name: 'Mgr Link', email: target.email, type: 'employee' })
       .select('id')
       .single()
-    await inviteMember(a.admin.db, adminDb(), a.firmId, { email: target.email, role: 'manager' }, REDIRECT)
+    const res = await inviteMember(a.admin.db, adminDb(), a.firmId, { email: target.email, role: 'manager' }, REDIRECT)
+    expect(res.ok).toBe(true)
     const { data: after } = await adminDb().from('consultants').select('user_id').eq('id', c!.id).single()
-    expect(after?.user_id).toBeNull()
+    expect(after?.user_id).toBe(target.id)
+  })
+
+  it('audits the membership insert with the inviting admin as actor', async () => {
+    const a = await newFirm('A')
+    const target = await newUser('audited')
+    const res = await inviteMember(a.admin.db, adminDb(), a.firmId, { email: target.email, role: 'consultant' }, REDIRECT)
+    expect(res.ok).toBe(true)
+    const { data: m } = await adminDb()
+      .from('firm_members')
+      .select('id')
+      .eq('firm_id', a.firmId)
+      .eq('user_id', target.id)
+      .single()
+    const { data: log, error } = await adminDb()
+      .from('audit_log')
+      .select('actor_id, action')
+      .eq('entity_type', 'firm_members')
+      .eq('entity_id', m!.id)
+    expect(error).toBeNull()
+    expect(log).toEqual([{ actor_id: a.admin.id, action: 'insert' }])
+  })
+})
+
+describe('add_firm_member RPC', () => {
+  it('a manager (or another firm admin) calling it directly fails and inserts nothing', async () => {
+    const a = await newFirm('A')
+    const b = await newFirm('B')
+    const target = await newUser('rpc')
+    for (const caller of [a.manager, a.consultant, b.admin]) {
+      const { data, error } = await caller.db.rpc('add_firm_member', {
+        p_firm: a.firmId,
+        p_user: target.id,
+        p_role: 'admin',
+      })
+      expect(data).toBeNull()
+      expect(error?.code).toBe('42501')
+    }
+    expect(await memberRows(a.firmId, target.id)).toHaveLength(0)
+  })
+
+  it('an admin calling it adds the member and gets the id back', async () => {
+    const a = await newFirm('A')
+    const target = await newUser('rpc-ok')
+    const { data, error } = await a.admin.db.rpc('add_firm_member', {
+      p_firm: a.firmId,
+      p_user: target.id,
+      p_role: 'manager',
+    })
+    expect(error).toBeNull()
+    const { data: row } = await adminDb()
+      .from('firm_members')
+      .select('id, role')
+      .eq('firm_id', a.firmId)
+      .eq('user_id', target.id)
+      .single()
+    expect(row).toEqual({ id: data, role: 'manager' })
+  })
+
+  it('anon cannot execute it', async () => {
+    const a = await newFirm('A')
+    const { error } = await anonDb().rpc('add_firm_member', {
+      p_firm: a.firmId,
+      p_user: a.consultant.id,
+      p_role: 'admin',
+    })
+    expect(error).not.toBeNull()
   })
 })
 

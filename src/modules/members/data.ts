@@ -34,8 +34,52 @@ export async function listMembers(db: SupabaseClient, firmId: string): Promise<R
 }
 
 /**
- * `db` is the caller's own (RLS) client and is used to verify the caller is an admin of the
- * firm; only then is the service-role `admin` client used.
+ * The user id of the member of `firmId` whose profile email matches `email` (case-insensitive),
+ * or null. Uses the caller's own client: RLS lets any member read co-members and their profiles.
+ */
+export async function findFirmMemberByEmail(
+  db: SupabaseClient,
+  firmId: string,
+  email: string,
+): Promise<Result<string | null>> {
+  const normalized = normalizeEmail(email)
+  if (!normalized) return ok(null)
+  const { data, error } = await db
+    .from('firm_members')
+    .select('user_id, profiles!inner(email)')
+    .eq('firm_id', firmId)
+    .ilike('profiles.email', likeLiteral(normalized))
+    .limit(1)
+  if (error) return fail(mapDbError(error))
+  const row = (data ?? [])[0] as { user_id: string } | undefined
+  return ok(row?.user_id ?? null)
+}
+
+/**
+ * Links this firm's unlinked consultant row with `email` (if any) to the member `userId`.
+ * Best effort: the link can always be made later from the consultant record.
+ */
+export async function linkConsultantByEmail(
+  db: SupabaseClient,
+  firmId: string,
+  userId: string,
+  email: string,
+): Promise<void> {
+  const normalized = normalizeEmail(email)
+  if (!normalized) return
+  const { error } = await db
+    .from('consultants')
+    .update({ user_id: userId })
+    .eq('firm_id', firmId)
+    .is('user_id', null)
+    .ilike('email', likeLiteral(normalized))
+  if (error) console.error('consultant link failed', error)
+}
+
+/**
+ * `db` is the caller's own (RLS) client. The membership is inserted through `add_firm_member`
+ * with that client, so the database re-checks the admin role and the audit log records the
+ * caller as actor. The service-role `admin` client is used only to look up or invite the user.
  */
 export async function inviteMember(
   db: SupabaseClient,
@@ -55,21 +99,15 @@ export async function inviteMember(
   const user = await findOrInviteUser(admin, email, redirectTo)
   if (!user.ok) return user
 
-  const { error: insErr } = await admin
-    .from('firm_members')
-    .insert({ firm_id: firmId, user_id: user.data.userId, role: input.role })
+  const { error: insErr } = await db.rpc('add_firm_member', {
+    p_firm: firmId,
+    p_user: user.data.userId,
+    p_role: input.role,
+  })
   if (insErr) return fail(mapDbError(insErr))
 
-  if (input.role === 'consultant') {
-    const { error: linkErr } = await admin
-      .from('consultants')
-      .update({ user_id: user.data.userId })
-      .eq('firm_id', firmId)
-      .is('user_id', null)
-      .ilike('email', likeLiteral(email))
-    // Membership exists already; a failed link can be fixed from the consultant record.
-    if (linkErr) console.error('consultant link failed', linkErr)
-  }
+  // Any role can also be a consultant (e.g. a manager who bills hours).
+  await linkConsultantByEmail(db, firmId, user.data.userId, email)
   return ok(user.data)
 }
 

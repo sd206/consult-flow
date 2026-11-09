@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { ConsultantType } from '@/lib/db-types'
 import type { FormResult } from '@/lib/form'
+import type { LoginOutcome } from '@/modules/consultants/data'
 import {
   addCostRateAction,
   createConsultantAction,
@@ -194,17 +195,35 @@ export function ActiveForm({
   )
 }
 
-export function InviteForm({ firmId, consultantId }: { firmId: string; consultantId: string }) {
-  const [state, action, pending] = useActionState<FormResult<{ invited: boolean }> | null, FormData>(
+const OUTCOME_MESSAGE: Record<LoginOutcome, string> = {
+  linked: 'Linked to existing user.',
+  invited: 'Invitation sent.',
+  added: 'Existing user added to this firm.',
+}
+
+/** Stays mounted after success (when `hasLogin` flips to true) so the outcome message remains visible. */
+export function InviteForm({
+  firmId,
+  consultantId,
+  hasLogin,
+}: {
+  firmId: string
+  consultantId: string
+  hasLogin: boolean
+}) {
+  const [state, action, pending] = useActionState<FormResult<{ outcome: LoginOutcome }> | null, FormData>(
     async () => inviteConsultantAction(firmId, consultantId),
     null,
   )
+  if (hasLogin && !state?.ok) return null
   return (
     <form action={action} className="flex flex-col gap-2">
-      <Button type="submit" variant="outline" disabled={pending} className="self-start">
-        {pending ? 'Inviting…' : 'Invite to log in'}
-      </Button>
-      <FormMessages state={state} success="Invitation sent." />
+      {!hasLogin && (
+        <Button type="submit" variant="outline" disabled={pending} className="self-start">
+          {pending ? 'Inviting…' : 'Invite to log in'}
+        </Button>
+      )}
+      <FormMessages state={state} success={state?.ok ? OUTCOME_MESSAGE[state.data.outcome] : ''} />
     </form>
   )
 }

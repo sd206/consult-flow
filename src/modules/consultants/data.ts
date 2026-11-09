@@ -5,6 +5,7 @@ import { isIsoDate, todayIso } from '@/lib/domain/dates'
 import { parseMoney } from '@/lib/domain/money'
 import { rateOn } from '@/lib/domain/rates'
 import { fail, ok, type Result } from '@/lib/result'
+import { findFirmMemberByEmail, inviteMember, linkConsultantByEmail } from '@/modules/members/data'
 
 const DENIED = "You don't have permission to do that."
 const BAD_DATE = 'Enter a valid start date.'
@@ -157,7 +158,15 @@ export async function createConsultant(
       return added
     }
   }
+  await autoLink(db, firmId, input.email)
   return ok({ id })
+}
+
+/** If a member of this firm (any role) has this email, link the firm's unlinked consultant row to them. */
+async function autoLink(db: SupabaseClient, firmId: string, email: string): Promise<void> {
+  const member = await findFirmMemberByEmail(db, firmId, email)
+  if (!member.ok) return
+  if (member.data) await linkConsultantByEmail(db, firmId, member.data, email)
 }
 
 export async function updateConsultant(
@@ -176,10 +185,56 @@ export async function updateConsultant(
     })
     .eq('firm_id', firmId)
     .eq('id', id)
-    .select('id')
+    .select('id, user_id')
   if (error) return fail(mapDbError(error))
   if (!data || data.length === 0) return fail(DENIED)
+  if (data[0]?.user_id === null) await autoLink(db, firmId, input.email)
   return ok(undefined)
+}
+
+export type LoginOutcome = 'linked' | 'invited' | 'added'
+
+/**
+ * "Invite to log in" for a consultant: if a member of this firm already has the consultant's
+ * email, link the record to them; otherwise invite the email as a consultant member (which also
+ * links the record). `db` is the caller's client; `admin` is the service-role client used only
+ * for the user lookup and invitation inside `inviteMember`.
+ */
+export async function linkOrInviteConsultant(
+  db: SupabaseClient,
+  admin: SupabaseClient,
+  firmId: string,
+  consultantId: string,
+  redirectTo: string,
+): Promise<Result<{ outcome: LoginOutcome }>> {
+  const consultant = await getConsultant(db, firmId, consultantId)
+  if (!consultant.ok) return consultant
+  if (consultant.data.hasLogin) return fail('This consultant can already log in.')
+
+  const member = await findFirmMemberByEmail(db, firmId, consultant.data.email)
+  if (!member.ok) return member
+  if (member.data) {
+    const { data, error } = await db
+      .from('consultants')
+      .update({ user_id: member.data })
+      .eq('firm_id', firmId)
+      .eq('id', consultantId)
+      .is('user_id', null)
+      .select('id')
+    if (error) return fail(mapDbError(error))
+    if (!data || data.length === 0) return fail(DENIED)
+    return ok({ outcome: 'linked' })
+  }
+
+  const invited = await inviteMember(
+    db,
+    admin,
+    firmId,
+    { email: consultant.data.email, role: 'consultant' },
+    redirectTo,
+  )
+  if (!invited.ok) return invited
+  return ok({ outcome: invited.data.invited ? 'invited' : 'added' })
 }
 
 export async function setConsultantActive(

@@ -22,6 +22,8 @@ const BY_MATCH: [string, string][] = [
   ['ASSIGNMENT_NOT_FOUND', 'Assignment not found.'],
   ['firms_invoice_pattern_seq_chk', 'Pattern must contain exactly one {SEQ:n}.'],
   ['firms_payment_terms_chk', 'Payment terms must be 0 to 365 days.'],
+  ['firms_logo_path_chk', "That logo file doesn't belong to this firm."],
+  ['consultants_firm_user_key', 'That user is already linked to another consultant.'],
 ]
 
 export function mapDbError(err: DbError | null): string {
