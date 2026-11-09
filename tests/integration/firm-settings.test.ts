@@ -1,0 +1,212 @@
+import { describe, expect, it } from 'vitest'
+import { getFirm, updateFirmSettings, uploadFirmLogo } from '@/modules/firms/data'
+import type { FirmSettingsInput } from '@/modules/firms/schemas'
+import { adminDb, newFirm } from './helpers'
+
+const DENIED = "You don't have permission to do that."
+const LOGO_ERR = 'Logo must be a PNG, JPEG or SVG under 2 MB.'
+
+const settings = (over: Partial<FirmSettingsInput> = {}): FirmSettingsInput => ({
+  name: 'Renamed Firm',
+  address: '1 Main St',
+  contactName: 'Pat',
+  contactEmail: 'pat@example.com',
+  contactPhone: '555-1234',
+  currency: 'GBP',
+  defaultTaxPercent: '20',
+  defaultPaymentTermsDays: 45,
+  invoiceNumberPattern: 'SRS-{YYYY}-{SEQ:4}',
+  ...over,
+})
+
+const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])
+const JPEG_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 1, 2])
+const buf = (u: Uint8Array): ArrayBuffer =>
+  u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength) as ArrayBuffer
+const text = (s: string): ArrayBuffer => buf(new TextEncoder().encode(s))
+const file = (name: string, type: string, bytes: ArrayBuffer) => ({
+  name,
+  type,
+  size: bytes.byteLength,
+  bytes,
+})
+
+async function logoObjects(firmId: string): Promise<string[]> {
+  const { data, error } = await adminDb().storage.from('firm-files').list(`firms/${firmId}/logo`)
+  expect(error).toBeNull()
+  return (data ?? []).map((o) => o.name)
+}
+
+describe('updateFirmSettings', () => {
+  it('admin persists settings', async () => {
+    const f = await newFirm()
+    const r = await updateFirmSettings(f.admin.db, f.firmId, settings())
+    expect(r.ok).toBe(true)
+    const { data } = await adminDb().from('firms').select('*').eq('id', f.firmId).single()
+    expect(data).toMatchObject({
+      name: 'Renamed Firm',
+      currency: 'GBP',
+      default_tax_percent: 20,
+      default_payment_terms_days: 45,
+      invoice_number_pattern: 'SRS-{YYYY}-{SEQ:4}',
+      contact_email: 'pat@example.com',
+    })
+  })
+
+  it('rejects an invalid pattern and persists nothing', async () => {
+    const f = await newFirm('Keep Name')
+    const r = await updateFirmSettings(
+      f.admin.db,
+      f.firmId,
+      settings({ invoiceNumberPattern: 'INV-{YYYY}' }),
+    )
+    expect(r).toEqual({ ok: false, error: 'Pattern must contain exactly one {SEQ:n}.' })
+    const { data } = await adminDb()
+      .from('firms')
+      .select('name, invoice_number_pattern')
+      .eq('id', f.firmId)
+      .single()
+    expect(data).toEqual({ name: 'Keep Name', invoice_number_pattern: 'INV-{YYYY}-{SEQ:4}' })
+  })
+
+  it('manager is denied (0 rows updated)', async () => {
+    const f = await newFirm('Manager Target')
+    const r = await updateFirmSettings(f.manager.db, f.firmId, settings())
+    expect(r).toEqual({ ok: false, error: DENIED })
+    const { data } = await adminDb().from('firms').select('name').eq('id', f.firmId).single()
+    expect(data?.name).toBe('Manager Target')
+  })
+
+  it('admin cannot update invoice_next_seq via PostgREST', async () => {
+    const f = await newFirm()
+    const { error } = await f.admin.db
+      .from('firms')
+      .update({ invoice_next_seq: 99 })
+      .eq('id', f.firmId)
+    expect(error).not.toBeNull()
+    const { data } = await adminDb()
+      .from('firms')
+      .select('invoice_next_seq')
+      .eq('id', f.firmId)
+      .single()
+    expect(data?.invoice_next_seq).toBe(1)
+  })
+
+  it('db rejects a pattern without {SEQ:n}, naming the constraint', async () => {
+    const f = await newFirm()
+    const { error } = await adminDb()
+      .from('firms')
+      .update({ invoice_number_pattern: 'INV-{YYYY}' })
+      .eq('id', f.firmId)
+    expect(error?.message).toContain('firms_invoice_pattern_seq_chk')
+  })
+
+  it('db rejects payment terms over 365 days', async () => {
+    const f = await newFirm()
+    const { error } = await adminDb()
+      .from('firms')
+      .update({ default_payment_terms_days: 366 })
+      .eq('id', f.firmId)
+    expect(error?.message).toContain('firms_payment_terms_chk')
+  })
+})
+
+describe('uploadFirmLogo', () => {
+  it('rejects a 12 MB PNG', async () => {
+    const f = await newFirm()
+    const big = new Uint8Array(12 * 1024 * 1024)
+    big.set(PNG_BYTES)
+    const r = await uploadFirmLogo(f.admin.db, f.firmId, file('big.png', 'image/png', buf(big)))
+    expect(r).toEqual({ ok: false, error: LOGO_ERR })
+    expect(await logoObjects(f.firmId)).toEqual([])
+  })
+
+  it('rejects an executable declared as PNG', async () => {
+    const f = await newFirm()
+    const exe = new Uint8Array([0x4d, 0x5a, 0x90, 0, 3, 0, 0, 0])
+    const r = await uploadFirmLogo(f.admin.db, f.firmId, file('x.png', 'image/png', buf(exe)))
+    expect(r).toEqual({ ok: false, error: LOGO_ERR })
+    expect(await logoObjects(f.firmId)).toEqual([])
+  })
+
+  it('rejects disallowed MIME types', async () => {
+    const f = await newFirm()
+    const r = await uploadFirmLogo(f.admin.db, f.firmId, file('x.gif', 'image/gif', buf(PNG_BYTES)))
+    expect(r).toEqual({ ok: false, error: LOGO_ERR })
+  })
+
+  it('rejects an SVG containing <script> or event-handler attributes', async () => {
+    const f = await newFirm()
+    const a = await uploadFirmLogo(
+      f.admin.db,
+      f.firmId,
+      file(
+        'x.svg',
+        'image/svg+xml',
+        text('<svg xmlns="http://www.w3.org/2000/svg"><SCRIPT>alert(1)</SCRIPT></svg>'),
+      ),
+    )
+    expect(a).toEqual({ ok: false, error: LOGO_ERR })
+    const b = await uploadFirmLogo(
+      f.admin.db,
+      f.firmId,
+      file('x.svg', 'image/svg+xml', text('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>')),
+    )
+    expect(b).toEqual({ ok: false, error: LOGO_ERR })
+    expect(await logoObjects(f.firmId)).toEqual([])
+  })
+
+  it('manager cannot upload a logo', async () => {
+    const f = await newFirm()
+    const r = await uploadFirmLogo(f.manager.db, f.firmId, file('x.png', 'image/png', buf(PNG_BYTES)))
+    expect(r.ok).toBe(false)
+    expect(await logoObjects(f.firmId)).toEqual([])
+  })
+
+  it('valid upload sets logo_path; a second upload replaces and removes the first', async () => {
+    const f = await newFirm()
+    const first = await uploadFirmLogo(f.admin.db, f.firmId, file('a.png', 'image/png', buf(PNG_BYTES)))
+    expect(first.ok).toBe(true)
+    if (!first.ok) return
+    expect(first.data.logoPath).toMatch(
+      new RegExp(`^firms/${f.firmId}/logo/[0-9a-f-]{36}\\.png$`),
+    )
+    const { data: row } = await adminDb().from('firms').select('logo_path').eq('id', f.firmId).single()
+    expect(row?.logo_path).toBe(first.data.logoPath)
+
+    const second = await uploadFirmLogo(f.admin.db, f.firmId, file('b.jpg', 'image/jpeg', buf(JPEG_BYTES)))
+    expect(second.ok).toBe(true)
+    if (!second.ok) return
+    expect(await logoObjects(f.firmId)).toEqual([second.data.logoPath.split('/').pop()])
+    const { data: row2 } = await adminDb().from('firms').select('logo_path').eq('id', f.firmId).single()
+    expect(row2?.logo_path).toBe(second.data.logoPath)
+  })
+
+  it('accepts a clean SVG', async () => {
+    const f = await newFirm()
+    const r = await uploadFirmLogo(
+      f.admin.db,
+      f.firmId,
+      file(
+        'x.svg',
+        'image/svg+xml',
+        text('<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>'),
+      ),
+    )
+    expect(r.ok).toBe(true)
+  })
+})
+
+describe('getFirm', () => {
+  it('returns the firm with a signed logoUrl when a logo is set', async () => {
+    const f = await newFirm('Logo Firm')
+    const none = await getFirm(f.admin.db, f.firmId)
+    expect(none.ok && none.data.logoUrl).toBeNull()
+    await uploadFirmLogo(f.admin.db, f.firmId, file('a.png', 'image/png', buf(PNG_BYTES)))
+    const r = await getFirm(f.admin.db, f.firmId)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.data.name).toBe('Logo Firm')
+    expect(r.data.logoUrl).toMatch(/^https?:\/\//)
+  })
+})

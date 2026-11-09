@@ -18,6 +18,8 @@ const BY_MATCH: [string, string][] = [
   ['project_assignments_no_overlap', 'This consultant already has a rate for this project in that date range.'],
   ['project_assignments_dates_chk', DATES],
   ['projects_dates_chk', DATES],
+  ['firms_invoice_pattern_seq_chk', 'Pattern must contain exactly one {SEQ:n}.'],
+  ['firms_payment_terms_chk', 'Payment terms must be 0 to 365 days.'],
 ]
 
 export function mapDbError(err: DbError | null): string {
