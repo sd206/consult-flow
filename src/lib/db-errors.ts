@@ -24,6 +24,21 @@ const BY_MATCH: [string, string][] = [
   ['firms_payment_terms_chk', 'Payment terms must be 0 to 365 days.'],
   ['firms_logo_path_chk', "That logo file doesn't belong to this firm."],
   ['consultants_firm_user_key', 'That user is already linked to another consultant.'],
+  ['TIMESHEET_LOCKED', "This timesheet is submitted or approved and can't be edited."],
+  ['TIMESHEET_STATE', "This timesheet can't be changed in its current state."],
+  ['TIMESHEET_EMPTY', 'Add some hours before submitting.'],
+  ['TIMESHEET_NOT_FOUND', 'Timesheet not found.'],
+  ['TIMESHEET_INVOICED', "This timesheet has invoiced hours, so it can't be reopened."],
+  ['FUTURE_WEEK', "You can't enter time for a future week."],
+  ['timesheets_week_start_monday_chk', 'Weeks start on Monday.'],
+  ['ENTRY_OUTSIDE_WEEK', "Each day must fall within the timesheet's week."],
+  ['NO_ASSIGNMENT', "You're not assigned to that project on one of those days."],
+  ['DAY_OVER_24', "A day can't have more than 24 hours in total."],
+  ['time_entries_hours_chk', 'Enter hours between 0.01 and 24, up to 2 decimal places.'],
+  ['time_entries_cell_key', 'That project already has hours on that day.'],
+  ['COST_RATE_MISSING', 'This consultant has no cost rate for a day worked. Add a cost rate starting on or before that day, then approve.'],
+  ['REJECT_COMMENT_REQUIRED', 'Add a comment saying what needs to change.'],
+  ['CONSULTANT_NOT_FOUND', 'Consultant not found.'],
 ]
 
 export function mapDbError(err: DbError | null): string {
