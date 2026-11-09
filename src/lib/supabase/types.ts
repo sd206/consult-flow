@@ -43,6 +43,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"clients": {
+                  Row: {
+                    "active": boolean,"billing_address": string | null,"billing_contact_name": string | null,"billing_email": string | null,"billing_phone": string | null,"created_at": string,"created_by": string | null,"firm_id": string,"id": string,"name": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"billing_address"?: string | null,"billing_contact_name"?: string | null,"billing_email"?: string | null,"billing_phone"?: string | null,"created_at"?: string,"created_by"?: string | null,"firm_id": string,"id"?: string,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"billing_address"?: string | null,"billing_contact_name"?: string | null,"billing_email"?: string | null,"billing_phone"?: string | null,"created_at"?: string,"created_by"?: string | null,"firm_id"?: string,"id"?: string,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "clients_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"consultant_cost_rates": {
                   Row: {
                     "consultant_id": string,"created_at": string,"created_by": string | null,"effective_from": string,"firm_id": string,"hourly_cost": number,"id": string,"updated_at": string
@@ -161,6 +181,64 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"project_assignments": {
+                  Row: {
+                    "client_rate": number,"consultant_id": string,"created_at": string,"created_by": string | null,"effective_from": string,"effective_to": string | null,"firm_id": string,"id": string,"project_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "client_rate": number,"consultant_id": string,"created_at"?: string,"created_by"?: string | null,"effective_from": string,"effective_to"?: string | null,"firm_id": string,"id"?: string,"project_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "client_rate"?: number,"consultant_id"?: string,"created_at"?: string,"created_by"?: string | null,"effective_from"?: string,"effective_to"?: string | null,"firm_id"?: string,"id"?: string,"project_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "project_assignments_consultant_fk"
+      columns: ["firm_id","consultant_id"]
+isOneToOne: false
+      referencedRelation: "consultants"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "project_assignments_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "project_assignments_project_fk"
+      columns: ["firm_id","project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
+      referencedColumns: ["firm_id","id"]
+    }
+                  ]
+                },"projects": {
+                  Row: {
+                    "client_id": string,"code": string | null,"created_at": string,"created_by": string | null,"end_date": string | null,"firm_id": string,"id": string,"name": string,"start_date": string | null,"status": Database["public"]['Enums']["project_status"],"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "client_id": string,"code"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_date"?: string | null,"firm_id": string,"id"?: string,"name": string,"start_date"?: string | null,"status"?: Database["public"]['Enums']["project_status"],"updated_at"?: string
+                  }
+                  Update: {
+                    "client_id"?: string,"code"?: string | null,"created_at"?: string,"created_by"?: string | null,"end_date"?: string | null,"firm_id"?: string,"id"?: string,"name"?: string,"start_date"?: string | null,"status"?: Database["public"]['Enums']["project_status"],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "projects_client_fk"
+      columns: ["firm_id","client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "projects_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"vendors": {
                   Row: {
                     "address": string | null,"contact_name": string | null,"created_at": string,"created_by": string | null,"email": string | null,"firm_id": string,"id": string,"name": string,"phone": string | null,"updated_at": string
@@ -196,6 +274,11 @@ isOneToOne: false
 "is_platform_owner":
 { Args: Record<PropertyKey, never>; Returns: boolean
                            },
+"my_assignments":
+{ Args: { "p_firm": string }; Returns: {
+              "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string
+            }[]
+                           },
 "platform_list_firms":
 { Args: Record<PropertyKey, never>; Returns: {
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
@@ -203,7 +286,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "consultant_type": "employee"|"independent"|"vendor","firm_role": "admin"|"manager"|"consultant"
+            "consultant_type": "employee"|"independent"|"vendor","firm_role": "admin"|"manager"|"consultant","project_status": "active"|"on_hold"|"closed"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -323,7 +406,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "consultant_type": ["employee", "independent", "vendor"],"firm_role": ["admin", "manager", "consultant"]
+            "consultant_type": ["employee", "independent", "vendor"],"firm_role": ["admin", "manager", "consultant"],"project_status": ["active", "on_hold", "closed"]
           }
         }
 } as const
