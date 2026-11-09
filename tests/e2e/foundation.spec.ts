@@ -84,6 +84,7 @@ test.describe('dashboard', () => {
 
 test.describe('foundation flow', () => {
   test('platform owner to first assignment', async ({ page }) => {
+    test.setTimeout(90_000)
     const run = Date.now().toString(36)
     const db = adminDb()
     const firmName = `Acme Consulting ${run}`

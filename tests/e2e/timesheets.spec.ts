@@ -268,3 +268,24 @@ test.describe('manager timesheet review', () => {
     expect(res?.status()).toBe(404)
   })
 })
+
+test('manager dashboard shows the awaiting approval count and links to timesheets', async ({ page }) => {
+  const f = await newFirm('Dash Firm')
+  const s = await seedTimesheetFixture(f, { assignFrom: '2026-01-05' })
+  const save = await f.consultant.db.rpc('save_timesheet_week', {
+    p_firm: f.firmId,
+    p_consultant: s.consultantId,
+    p_week_start: PAST_WEEK,
+    p_entries: [{ projectId: s.projectId, workDate: PAST_WEEK, hours: '8', note: null }],
+  })
+  expect(save.error).toBeNull()
+  const sub = await f.consultant.db.rpc('submit_timesheet', { p_timesheet: save.data as string })
+  expect(sub.error).toBeNull()
+  await login(page, f.manager.email)
+  await page.goto(`/f/${f.firmId}`)
+  const card = page.getByTestId('awaiting-approval')
+  await expect(card).toContainText('Awaiting approval')
+  await expect(card).toContainText('1')
+  await card.getByRole('link', { name: 'Awaiting approval' }).click()
+  await expect(page).toHaveURL(new RegExp(`/f/${f.firmId}/timesheets$`))
+})

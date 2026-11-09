@@ -48,6 +48,13 @@ npm run test:e2e    # Playwright; needs local Supabase running
 
 `test:e2e` builds the app and starts it on port 3000 (reusing a server already running there when not in CI), and runs the browser tests serially. Also run `npm run lint` and `npm run typecheck`.
 
+## Timesheets
+
+- Weeks start on Monday. Time can be entered for the current and past weeks only ("today" is UTC); future weeks are not allowed.
+- Consultants enter and submit their own timesheet at `/f/{firmId}/timesheet`. Admins and Managers review submitted timesheets at `/f/{firmId}/timesheets`, and approve or reject them with a comment. They may approve their own. Managers can also enter time on someone's behalf.
+- Rates are frozen on approval. An approved timesheet can be reopened while none of its hours are invoiced.
+- To let an Admin or Manager log their own time, link their login to a consultant record: an Admin opens Consultants, opens the consultant, and chooses "Invite to log in" (this links an existing member or invites the email).
+
 ## Hosted Supabase
 
 ### Platform owner

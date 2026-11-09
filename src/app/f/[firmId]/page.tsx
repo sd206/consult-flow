@@ -15,6 +15,11 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
             My projects
           </Link>
         </p>
+        <p className="mt-2 text-sm">
+          <Link href={`/f/${firmId}/timesheet`} className="underline underline-offset-4">
+            My timesheet
+          </Link>
+        </p>
       </div>
     )
   }
@@ -32,7 +37,7 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
         </p>
       ) : (
         <>
-          <dl className="mt-4 grid grid-cols-3 gap-4 text-sm">
+          <dl className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div className="rounded border p-3">
               <dt className="text-muted-foreground">Active consultants</dt>
               <dd className="text-2xl font-semibold">{summary.data.consultants}</dd>
@@ -45,7 +50,20 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
               <dt className="text-muted-foreground">Active projects</dt>
               <dd className="text-2xl font-semibold">{summary.data.projects}</dd>
             </div>
+            <div className="rounded border p-3" data-testid="awaiting-approval">
+              <dt className="text-muted-foreground">
+                <Link href={`/f/${firmId}/timesheets`} className="underline underline-offset-4">
+                  Awaiting approval
+                </Link>
+              </dt>
+              <dd className="text-2xl font-semibold">{summary.data.awaitingApproval}</dd>
+            </div>
           </dl>
+          <p className="mt-4 text-sm">
+            <Link href={`/f/${firmId}/timesheet`} className="underline underline-offset-4">
+              My timesheet
+            </Link>
+          </p>
 
           <h2 className="mt-8 text-lg font-medium">Finish setup</h2>
           <ul className="mt-2 space-y-2 text-sm">

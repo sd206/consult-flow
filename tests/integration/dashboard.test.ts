@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getDashboardSummary } from '@/modules/firms/dashboard'
 import { adminDb, newFirm } from './helpers'
+import { PAST_WEEK, seedTimesheetFixture } from './timesheet-fixtures'
 
 describe('getDashboardSummary', () => {
   it('counts active consultants, clients, projects and setup progress for a manager', async () => {
@@ -9,7 +10,7 @@ describe('getDashboardSummary', () => {
     const first = await getDashboardSummary(f.manager.db, f.firmId)
     expect(first).toEqual({
       ok: true,
-      data: { consultants: 0, clients: 0, projects: 0, assignments: 0, hasLogo: false },
+      data: { consultants: 0, clients: 0, projects: 0, assignments: 0, hasLogo: false, awaitingApproval: 0 },
     })
 
     const { data: c1 } = await a.from('clients').insert({ firm_id: f.firmId, name: 'Active Co' }).select('id').single()
@@ -40,7 +41,7 @@ describe('getDashboardSummary', () => {
     const res = await getDashboardSummary(f.manager.db, f.firmId)
     expect(res).toEqual({
       ok: true,
-      data: { consultants: 1, clients: 1, projects: 1, assignments: 1, hasLogo: true },
+      data: { consultants: 1, clients: 1, projects: 1, assignments: 1, hasLogo: true, awaitingApproval: 0 },
     })
   })
 
@@ -55,5 +56,23 @@ describe('getDashboardSummary', () => {
       ok: true,
       data: { consultants: 0, clients: 0, projects: 0, assignments: 0 },
     })
+  })
+
+  it('counts submitted timesheets as awaiting approval', async () => {
+    const f = await newFirm()
+    const s = await seedTimesheetFixture(f)
+    const save = await f.consultant.db.rpc('save_timesheet_week', {
+      p_firm: f.firmId,
+      p_consultant: s.consultantId,
+      p_week_start: PAST_WEEK,
+      p_entries: [{ projectId: s.projectId, workDate: PAST_WEEK, hours: '8', note: null }],
+    })
+    expect(save.error).toBeNull()
+    const before = await getDashboardSummary(f.manager.db, f.firmId)
+    expect(before).toMatchObject({ ok: true, data: { awaitingApproval: 0 } })
+    const sub = await f.consultant.db.rpc('submit_timesheet', { p_timesheet: save.data as string })
+    expect(sub.error).toBeNull()
+    const after = await getDashboardSummary(f.manager.db, f.firmId)
+    expect(after).toMatchObject({ ok: true, data: { awaitingApproval: 1 } })
   })
 })

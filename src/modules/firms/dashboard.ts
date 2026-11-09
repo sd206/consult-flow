@@ -8,6 +8,7 @@ export type DashboardSummary = {
   projects: number
   assignments: number
   hasLogo: boolean
+  awaitingApproval: number
 }
 
 /**
@@ -16,14 +17,15 @@ export type DashboardSummary = {
  * should still only render the result for admin/manager roles.
  */
 export async function getDashboardSummary(db: SupabaseClient, firmId: string): Promise<Result<DashboardSummary>> {
-  const [consultants, clients, projects, assignments, firm] = await Promise.all([
+  const [consultants, clients, projects, assignments, firm, awaiting] = await Promise.all([
     db.from('consultants').select('id', { count: 'exact', head: true }).eq('firm_id', firmId).eq('active', true),
     db.from('clients').select('id', { count: 'exact', head: true }).eq('firm_id', firmId).eq('active', true),
     db.from('projects').select('id', { count: 'exact', head: true }).eq('firm_id', firmId).eq('status', 'active'),
     db.from('project_assignments').select('id', { count: 'exact', head: true }).eq('firm_id', firmId),
     db.from('firms').select('logo_path').eq('id', firmId).maybeSingle(),
+    db.from('timesheets').select('id', { count: 'exact', head: true }).eq('firm_id', firmId).eq('status', 'submitted'),
   ])
-  const failed = [consultants, clients, projects, assignments, firm].find((r) => r.error)
+  const failed = [consultants, clients, projects, assignments, firm, awaiting].find((r) => r.error)
   if (failed?.error) return fail(mapDbError(failed.error))
   const logo = (firm.data as { logo_path: string | null } | null)?.logo_path
   return ok({
@@ -32,5 +34,6 @@ export async function getDashboardSummary(db: SupabaseClient, firmId: string): P
     projects: projects.count ?? 0,
     assignments: assignments.count ?? 0,
     hasLogo: Boolean(logo),
+    awaitingApproval: awaiting.count ?? 0,
   })
 }
