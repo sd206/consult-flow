@@ -248,6 +248,52 @@ describe('issue_invoice', () => {
     )
   })
 
+  it('lets only one of two concurrent issues claim the same hours', async () => {
+    const { f, ids } = await hoursFixture()
+    const a = await draft(f, ids.clientId)
+    const b = await draft(f, ids.clientId)
+
+    const results = await Promise.all([issue(f, a), issue(f, b)])
+    const ok = results.filter((r) => r.error === null)
+    const failed = results.filter((r) => r.error !== null)
+    expect(ok).toHaveLength(1)
+    expect(ok[0].data).toBe('SRS-2026-0041')
+    expect(failed).toHaveLength(1)
+    expect(text(failed[0].error)).toContain('INVOICE_STALE')
+    expect(await nextSeq(f.firmId)).toBe(42)
+
+    const winner = results[0].error === null ? a : b
+    const [line] = await lineIds(winner)
+    expect((await entries(ids.timesheetId)).every((e) => e.invoice_line_id === line)).toBe(true)
+  })
+
+  it('never both issues and reopens when the two race', async () => {
+    const { f, ids } = await hoursFixture()
+    const invoiceId = await draft(f, ids.clientId)
+
+    const [issued, reopened] = await Promise.all([
+      issue(f, invoiceId),
+      f.manager.db.rpc('reopen_timesheet', { p_timesheet: ids.timesheetId }),
+    ])
+    const { data: ts } = await adminDb()
+      .from('timesheets')
+      .select('status')
+      .eq('id', ids.timesheetId)
+      .single()
+    const es = await entries(ids.timesheetId)
+
+    if (issued.error === null) {
+      expect(text(reopened.error)).toContain('TIMESHEET_INVOICED')
+      expect((ts as { status: string }).status).toBe('approved')
+      expect(es.every((e) => e.invoice_line_id !== null)).toBe(true)
+    } else {
+      expect(text(issued.error)).toContain('INVOICE_STALE')
+      expect(reopened.error).toBeNull()
+      expect((ts as { status: string }).status).toBe('draft')
+      expect(es.every((e) => e.invoice_line_id === null)).toBe(true)
+    }
+  })
+
   it('numbers concurrent issues uniquely and consecutively', async () => {
     const f = await newFirm()
     await setNumbering(f.firmId, 7)
