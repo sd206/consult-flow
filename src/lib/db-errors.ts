@@ -59,6 +59,14 @@ const BY_MATCH: [string, string][] = [
   ['TEMPLATE_NOT_FOUND', 'Template not found.'],
   ['invoice_templates_one_default', 'Only one template can be the default.'],
   ['invoices_discount_chk', "A percentage discount must be between 0 and 100, and an amount can't be negative."],
+  ['PAYMENT_NOT_FOUND', 'Payment not found.'],
+  ['PAYMENT_TOO_LARGE', 'This payment is more than the balance due.'],
+  ['PAYMENT_NOT_ALLOWED', "Payments can only be recorded on issued invoices that aren't fully paid."],
+  ['PAYMENT_LOCKED', "Payments on this invoice can't be changed."],
+  ['PAYMENT_FUTURE', "The payment date can't be in the future."],
+  ['payments_amount_chk', 'Enter an amount above 0.'],
+  ['ATTACHMENT_NOT_FOUND', 'File not found.'],
+  ['attachments_path_chk', "That file doesn't belong here."],
 ]
 
 /**

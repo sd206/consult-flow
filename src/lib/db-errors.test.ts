@@ -99,6 +99,21 @@ describe('mapDbError', () => {
     expect(mapDbError({ code: 'P0001', message: `x ${needle} y` })).toBe(expected)
   })
 
+  const paymentCases: [string, string][] = [
+    ['PAYMENT_NOT_FOUND', 'Payment not found.'],
+    ['PAYMENT_TOO_LARGE', 'This payment is more than the balance due.'],
+    ['PAYMENT_NOT_ALLOWED', "Payments can only be recorded on issued invoices that aren't fully paid."],
+    ['PAYMENT_LOCKED', "Payments on this invoice can't be changed."],
+    ['PAYMENT_FUTURE', "The payment date can't be in the future."],
+    ['payments_amount_chk', 'Enter an amount above 0.'],
+    ['ATTACHMENT_NOT_FOUND', 'File not found.'],
+    ['attachments_path_chk', "That file doesn't belong here."],
+  ]
+
+  it.each(paymentCases)('payment error %s', (needle, expected) => {
+    expect(mapDbError({ code: 'P0001', message: `x ${needle} y` })).toBe(expected)
+  })
+
   const fkDelete = (name: string, table: string) => ({
     code: '23503',
     message: `update or delete on table "${table}" violates foreign key constraint "${name}" on table "invoices"`,
