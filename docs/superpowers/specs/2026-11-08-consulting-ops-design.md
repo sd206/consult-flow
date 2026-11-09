@@ -128,6 +128,9 @@ Snapshots: on issue, the client billing details and firm header are copied onto 
 4. Manager edits subject, descriptions, issue/due dates, tax percent; may regenerate lines from selection while draft.
 5. **Issue**: in one transaction — assign number, snapshot firm and client details, link entries to lines (locking them), set status `issued`. PDF rendered and stored after commit; if rendering fails the invoice stays issued and the PDF can be regenerated.
 6. **Void** (issued invoices with no payments): status `void`, entries unlinked so they can be re-invoiced; number remains consumed. Drafts can be deleted outright.
+7. **Manual lines:** a draft may also have manual lines (description, quantity, unit price; amount = round(quantity × unit price, 2)) for fixed fees or rebilled costs. They are not linked to timesheets and survive regenerating the hours lines.
+8. **Daily detail page:** a template option adds a second PDF page listing each invoiced entry (date, consultant, project, hours, task note).
+9. **Templates:** a firm keeps several named templates; exactly one is the default; each firm starts with a default "Standard" template (classic layout).
 
 ### 5.3 Payment reconciliation (manual)
 1. From an invoice or the Unpaid Invoices list, Manager records a payment and attaches one or more files.
