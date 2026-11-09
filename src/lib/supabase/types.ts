@@ -283,6 +283,9 @@ isOneToOne: false
 { Args: Record<PropertyKey, never>; Returns: {
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
             }[]
+                           },
+"storage_firm_id":
+{ Args: { "p_name": string }; Returns: string
                            }
           }
           Enums: {
