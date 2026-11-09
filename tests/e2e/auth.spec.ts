@@ -43,6 +43,8 @@ twoFirms('other firm and manager-only pages are 404 for consultant', async ({ pa
   expect(other?.status()).toBe(404)
   const clients = await page.goto(`/f/${a.firmId}/clients`)
   expect(clients?.status()).toBe(404)
+  const projects = await page.goto(`/f/${a.firmId}/projects`)
+  expect(projects?.status()).toBe(404)
 })
 
 test('wrong password shows an alert', async ({ page }) => {

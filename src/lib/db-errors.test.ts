@@ -38,6 +38,8 @@ describe('mapDbError', () => {
     ['project_assignments_no_overlap', { code: '23P01', message: 'conflicting key value violates exclusion constraint "project_assignments_no_overlap"' }, 'This consultant already has a rate for this project in that date range.'],
     ['project_assignments_dates_chk', check('project_assignments_dates_chk'), 'The end date must be on or after the start date.'],
     ['projects_dates_chk', check('projects_dates_chk'), 'The end date must be on or after the start date.'],
+    ['RATE_DATE_INVALID', { code: 'P0001', message: 'RATE_DATE_INVALID' }, "The new rate must start after the current rate's start date."],
+    ['ASSIGNMENT_NOT_FOUND', { code: 'P0001', message: 'ASSIGNMENT_NOT_FOUND' }, 'Assignment not found.'],
     ['42501', { code: '42501', message: 'permission denied' }, "You don't have permission to do that."],
     ['RLS violation', { code: '42501', message: 'new row violates row-level security policy for table "x"' }, "You don't have permission to do that."],
     ['constraint in details', { code: '23505', message: 'duplicate key', details: 'constraint "projects_firm_code_key"' }, 'That project code is already in use.'],

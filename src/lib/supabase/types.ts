@@ -265,7 +265,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "create_firm_with_admin":
+            "change_client_rate":
+{ Args: { "p_assignment": string,"p_from": string,"p_rate": number }; Returns: string
+                           },
+"create_firm_with_admin":
 { Args: { "p_admin": string,"p_name": string }; Returns: string
                            },
 "has_role":
