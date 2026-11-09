@@ -148,3 +148,54 @@ export async function insertDraftInvoiceLine(firmId: string, clientId: string): 
   })
   return line.id
 }
+
+/**
+ * Creates (manager) a draft for a new client with no time lines and one
+ * manual line of 1 x `amount`; returns the invoice and client ids.
+ */
+export async function createManualDraft(
+  f: Firm,
+  amount: string | number = 1000,
+): Promise<{ invoiceId: string; clientId: string }> {
+  const db = adminDb()
+  const client = await insertOne<{ id: string }>('clients', {
+    firm_id: f.firmId,
+    name: `Client ${crypto.randomUUID()}`,
+  })
+  const { data: tpl, error: tErr } = await db
+    .from('invoice_templates')
+    .select('id')
+    .eq('firm_id', f.firmId)
+    .eq('is_default', true)
+    .single()
+  if (tErr || !tpl) throw new Error(`default template lookup failed: ${tErr?.message}`)
+  const { data: invoiceId, error } = await f.manager.db.rpc('create_invoice_draft', {
+    p_firm: f.firmId,
+    p_client: client.id,
+    p_start: '2026-10-01',
+    p_end: '2026-10-31',
+    p_template: (tpl as { id: string }).id,
+    p_consultants: [],
+  })
+  if (error || !invoiceId) throw new Error(`create_invoice_draft failed: ${error?.message}`)
+  const { error: lErr } = await f.manager.db.rpc('save_manual_line', {
+    p_invoice: invoiceId,
+    p_line: null,
+    p_description: 'Fee',
+    p_quantity: 1,
+    p_unit_price: amount,
+  })
+  if (lErr) throw new Error(`save_manual_line failed: ${lErr.message}`)
+  return { invoiceId: invoiceId as string, clientId: client.id }
+}
+
+/** Creates and issues (manager) a manual-line-only invoice whose total is `amount`. */
+export async function issueManualInvoice(
+  f: Firm,
+  amount: string | number = 1000,
+): Promise<{ invoiceId: string; clientId: string }> {
+  const ids = await createManualDraft(f, amount)
+  const { error } = await f.manager.db.rpc('issue_invoice', { p_invoice: ids.invoiceId })
+  if (error) throw new Error(`issue_invoice failed: ${error.message}`)
+  return ids
+}

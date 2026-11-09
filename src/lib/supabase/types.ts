@@ -23,7 +23,33 @@ export type Database = {
           }
         },"public": {
           Tables: {
-            "audit_log": {
+            "attachments": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"file_name": string,"firm_id": string,"id": string,"mime_type": string,"payment_id": string | null,"size_bytes": number,"storage_path": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"file_name": string,"firm_id": string,"id"?: string,"mime_type": string,"payment_id"?: string | null,"size_bytes": number,"storage_path": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"file_name"?: string,"firm_id"?: string,"id"?: string,"mime_type"?: string,"payment_id"?: string | null,"size_bytes"?: number,"storage_path"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "attachments_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "attachments_payment_fk"
+      columns: ["firm_id","payment_id"]
+isOneToOne: false
+      referencedRelation: "payments"
+      referencedColumns: ["firm_id","id"]
+    }
+                  ]
+                },"audit_log": {
                   Row: {
                     "action": string,"actor_id": string | null,"after": Json | null,"at": string,"before": Json | null,"entity_id": string,"entity_type": string,"firm_id": string,"id": string
                   }
@@ -269,6 +295,32 @@ isOneToOne: false
       referencedColumns: ["user_id"]
     }
                   ]
+                },"payments": {
+                  Row: {
+                    "amount": number,"created_at": string,"created_by": string | null,"firm_id": string,"id": string,"invoice_id": string,"method": Database["public"]['Enums']["payment_method"],"notes": string | null,"paid_on": string,"reference": string | null,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"created_at"?: string,"created_by"?: string | null,"firm_id": string,"id"?: string,"invoice_id": string,"method": Database["public"]['Enums']["payment_method"],"notes"?: string | null,"paid_on": string,"reference"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"created_at"?: string,"created_by"?: string | null,"firm_id"?: string,"id"?: string,"invoice_id"?: string,"method"?: Database["public"]['Enums']["payment_method"],"notes"?: string | null,"paid_on"?: string,"reference"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "payments_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "payments_invoice_fk"
+      columns: ["firm_id","invoice_id"]
+isOneToOne: false
+      referencedRelation: "invoices"
+      referencedColumns: ["firm_id","id"]
+    }
+                  ]
                 },"profiles": {
                   Row: {
                     "created_at": string,"display_name": string | null,"email": string,"is_platform_owner": boolean,"updated_at": string,"user_id": string
@@ -440,6 +492,9 @@ isOneToOne: false
             "add_firm_member":
 { Args: { "p_firm": string,"p_role": Database["public"]['Enums']["firm_role"],"p_user": string }; Returns: string
                            },
+"add_payment_attachment":
+{ Args: { "p_file_name": string,"p_mime": string,"p_payment": string,"p_size": number,"p_storage_path": string }; Returns: string
+                           },
 "approve_timesheet":
 { Args: { "p_timesheet": string }; Returns: undefined
                            },
@@ -455,17 +510,26 @@ isOneToOne: false
 "create_invoice_draft":
 { Args: { "p_client": string,"p_consultants": (string)[],"p_end": string,"p_firm": string,"p_start": string,"p_template": string }; Returns: string
                            },
+"delete_attachment":
+{ Args: { "p_attachment": string }; Returns: string
+                           },
 "delete_invoice_draft":
 { Args: { "p_invoice": string }; Returns: undefined
                            },
 "delete_manual_line":
 { Args: { "p_line": string }; Returns: undefined
                            },
+"delete_payment":
+{ Args: { "p_payment": string }; Returns: string[]
+                           },
 "format_invoice_number":
 { Args: { "p_issue": string,"p_pattern": string,"p_seq": number }; Returns: string
                            },
 "has_role":
 { Args: { "p_firm": string,"p_roles": (Database["public"]['Enums']["firm_role"])[] }; Returns: boolean
+                           },
+"invoice_apply_payments":
+{ Args: { "p_invoice": string }; Returns: undefined
                            },
 "invoice_candidates":
 { Args: { "p_client": string,"p_end": string,"p_firm": string,"p_start": string }; Returns: {
@@ -547,10 +611,33 @@ isOneToOne: false
               "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string
             }[]
                            },
+"payment_lock":
+{ Args: { "p_missing": string,"p_payment": string }; Returns: {
+              "amount": number,
+"created_at": string,
+"created_by": string | null,
+"firm_id": string,
+"id": string,
+"invoice_id": string,
+"method": Database["public"]['Enums']["payment_method"],
+"notes": string | null,
+"paid_on": string,
+"reference": string | null,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "payments"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
 "platform_list_firms":
 { Args: Record<PropertyKey, never>; Returns: {
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
             }[]
+                           },
+"record_payment":
+{ Args: { "p_amount": number,"p_invoice": string,"p_method": Database["public"]['Enums']["payment_method"],"p_notes": string,"p_paid_on": string,"p_reference": string }; Returns: string
                            },
 "regenerate_invoice_lines":
 { Args: { "p_consultants": (string)[],"p_invoice": string }; Returns: undefined
@@ -606,6 +693,9 @@ isOneToOne: false
 "update_invoice_period":
 { Args: { "p_consultants": (string)[],"p_end": string,"p_invoice": string,"p_start": string }; Returns: undefined
                            },
+"update_payment_details":
+{ Args: { "p_method": Database["public"]['Enums']["payment_method"],"p_notes": string,"p_paid_on": string,"p_payment": string,"p_reference": string }; Returns: undefined
+                           },
 "void_invoice":
 { Args: { "p_invoice": string }; Returns: undefined
                            },
@@ -616,7 +706,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "consultant_type": "employee"|"independent"|"vendor","firm_role": "admin"|"manager"|"consultant","invoice_discount_type": "none"|"percent"|"amount","invoice_layout": "classic"|"modern"|"compact","invoice_line_kind": "time"|"manual","invoice_status": "draft"|"issued"|"partly_paid"|"paid"|"void","project_status": "active"|"on_hold"|"closed","timesheet_status": "draft"|"submitted"|"approved"|"rejected"
+            "consultant_type": "employee"|"independent"|"vendor","firm_role": "admin"|"manager"|"consultant","invoice_discount_type": "none"|"percent"|"amount","invoice_layout": "classic"|"modern"|"compact","invoice_line_kind": "time"|"manual","invoice_status": "draft"|"issued"|"partly_paid"|"paid"|"void","payment_method": "bank_transfer"|"check"|"card"|"cash"|"other","project_status": "active"|"on_hold"|"closed","timesheet_status": "draft"|"submitted"|"approved"|"rejected"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -736,7 +826,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "consultant_type": ["employee", "independent", "vendor"],"firm_role": ["admin", "manager", "consultant"],"invoice_discount_type": ["none", "percent", "amount"],"invoice_layout": ["classic", "modern", "compact"],"invoice_line_kind": ["time", "manual"],"invoice_status": ["draft", "issued", "partly_paid", "paid", "void"],"project_status": ["active", "on_hold", "closed"],"timesheet_status": ["draft", "submitted", "approved", "rejected"]
+            "consultant_type": ["employee", "independent", "vendor"],"firm_role": ["admin", "manager", "consultant"],"invoice_discount_type": ["none", "percent", "amount"],"invoice_layout": ["classic", "modern", "compact"],"invoice_line_kind": ["time", "manual"],"invoice_status": ["draft", "issued", "partly_paid", "paid", "void"],"payment_method": ["bank_transfer", "check", "card", "cash", "other"],"project_status": ["active", "on_hold", "closed"],"timesheet_status": ["draft", "submitted", "approved", "rejected"]
           }
         }
 } as const
