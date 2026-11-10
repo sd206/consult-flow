@@ -174,6 +174,23 @@ describe('expenses data module', () => {
     must(await deleteCategory(g.manager.db, g.firmId, meals))
   })
 
+  it('creating twice with the same id (a retry) gives one expense', async () => {
+    const g = await newFirm('Expenses Retry Firm')
+    const cat = await categoryId(g.firmId, 'Travel')
+    const id = crypto.randomUUID()
+    expect(await createExpense(g.manager.db, g.firmId, input({ categoryId: cat, amount: '31.07' }), id)).toEqual({ ok: true, data: { id } })
+    expect(await createExpense(g.manager.db, g.firmId, input({ categoryId: cat, amount: '31.07' }), id)).toEqual({ ok: true, data: { id } })
+    const { data } = await adminDb().from('expenses').select('id').eq('firm_id', g.firmId)
+    expect(data).toEqual([{ id }])
+
+    // The same id in another firm is not "already saved".
+    const h = await newFirm('Expenses Retry Other')
+    const other = await createExpense(h.manager.db, h.firmId, input({ categoryId: await categoryId(h.firmId, 'Travel') }), id)
+    expect(other.ok).toBe(false)
+    const { data: none } = await adminDb().from('expenses').select('id').eq('firm_id', h.firmId)
+    expect(none).toEqual([])
+  })
+
   it('does not return another firm expense', async () => {
     const a = await newFirm('Expenses Firm A')
     const b = await newFirm('Expenses Firm B')

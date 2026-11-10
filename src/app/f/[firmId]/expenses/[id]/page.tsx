@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireFirmRole } from '@/lib/auth/context'
+import { rejectedFilesNotice } from '@/lib/domain/rejected-files'
 import { getExpense } from '@/modules/expenses/data'
 import { DeleteExpenseButton, ExpenseForm, ReceiptsSection } from '../expense-form'
 import { loadFormOptions } from '../form-data'
@@ -10,7 +11,7 @@ export default async function ExpensePage({
   searchParams,
 }: {
   params: Promise<{ firmId: string; id: string }>
-  searchParams: Promise<{ added?: string | string[]; fileWarning?: string | string[] }>
+  searchParams: Promise<{ added?: string | string[]; filesRejected?: string | string[] }>
 }) {
   const { firmId, id } = await params
   const sp = await searchParams
@@ -19,7 +20,7 @@ export default async function ExpensePage({
   if (!res.ok) notFound()
   const e = res.data
   const added = sp.added === '1'
-  const fileWarning = typeof sp.fileWarning === 'string' ? sp.fileWarning.slice(0, 500) : null
+  const fileWarning = rejectedFilesNotice(sp.filesRejected)
 
   return (
     <div className="max-w-5xl">

@@ -47,3 +47,8 @@ export const expenseInputSchema = z.object({
     .max(1000, 'Keep this to 1000 characters or fewer.')
     .transform((v) => (v === '' ? null : v)),
 })
+
+/** A new expense also carries the id its form generated once, so a retried save can't duplicate it. */
+export const newExpenseSchema = expenseInputSchema.extend({
+  id: z.uuid({ message: 'Something went wrong. Please try again.' }),
+})

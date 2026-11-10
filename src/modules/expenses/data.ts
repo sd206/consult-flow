@@ -157,12 +157,25 @@ function columns(input: ExpenseInput) {
   }
 }
 
-export async function createExpense(db: SupabaseClient, firmId: string, input: ExpenseInput): Promise<Result<{ id: string }>> {
+/**
+ * Creates the expense. With `id` (generated once per form) a retried create is idempotent:
+ * if that id already exists in this firm, the earlier insert went through and it is returned.
+ */
+export async function createExpense(
+  db: SupabaseClient,
+  firmId: string,
+  input: ExpenseInput,
+  id?: string,
+): Promise<Result<{ id: string }>> {
   const { data, error } = await db
     .from('expenses')
-    .insert({ firm_id: firmId, ...columns(input) })
+    .insert({ firm_id: firmId, ...(id ? { id } : {}), ...columns(input) })
     .select('id')
     .single()
+  if (error && id && error.code === '23505' && (error.message ?? '').includes('expenses_pkey')) {
+    const existing = await db.from('expenses').select('id').eq('firm_id', firmId).eq('id', id).maybeSingle()
+    if (!existing.error && existing.data) return ok({ id })
+  }
   if (error || !data) return fail(mapDbError(error))
   return ok({ id: (data as { id: string }).id })
 }

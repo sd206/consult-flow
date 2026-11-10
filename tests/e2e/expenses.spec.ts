@@ -3,6 +3,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 
 const REMITTANCE = path.join(__dirname, 'fixtures', 'remittance.pdf')
+const FAKE = path.join(__dirname, 'fixtures', 'fake.pdf')
 
 type Firm = Awaited<ReturnType<typeof newFirm>>
 
@@ -83,13 +84,14 @@ test('no receipt filter', async ({ page }) => {
   await fillExpense(page, { payee: 'Bare Co', amount: '77.77' })
 
   await page.goto(`/f/${f.firmId}/expenses`)
+  await expect(page.getByText('2 expenses · $128.88')).toBeVisible()
   await expect(page.getByRole('row', { name: /Bare Co/ })).toContainText('No receipt')
   await expect(page.getByRole('row', { name: /Has Receipt Co/ })).toBeVisible()
   await page.getByLabel('No receipt only').check()
   await page.getByRole('button', { name: 'Filter' }).click()
   await expect(page.getByRole('row', { name: /Has Receipt Co/ })).toHaveCount(0)
   await expect(page.getByRole('row', { name: /Bare Co/ })).toBeVisible()
-  await expect(page.getByText('1 expenses · $77.77')).toBeVisible()
+  await expect(page.getByText('1 expense · $77.77')).toBeVisible()
 })
 
 test('categories: add, duplicate, retire, restore, delete rules', async ({ page }) => {
@@ -143,4 +145,49 @@ test('a consultant gets a 404', async ({ page }) => {
     const res = await page.goto(`/f/${f.firmId}/${p}`)
     expect(res?.status()).toBe(404)
   }
+})
+
+test('a rejected receipt is named in the fixed notice', async ({ page }) => {
+  const { f } = await setup('Exp Rejected Firm')
+  await openNew(page, f)
+  await fillExpense(page, { payee: 'Fake Receipt Co', amount: '88.21', file: FAKE })
+  expect(new URL(page.url()).searchParams.get('filesRejected')).toBe('fake.pdf')
+  await expect(page.getByRole('status').filter({ hasText: "Expense saved, but some receipts weren't attached: fake.pdf." })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'fake.pdf' })).toHaveCount(0)
+
+  // Only names come from the URL; the sentence is fixed and long values are capped.
+  const url = new URL(page.url())
+  url.searchParams.set('filesRejected', 'y'.repeat(400))
+  await page.goto(url.toString())
+  await expect(page.getByRole('status').filter({ hasText: `attached: ${'y'.repeat(300)}.` })).toBeVisible()
+})
+
+test('editing: a project of another client shows that client after saving', async ({ page }) => {
+  const { f, globex } = await setup('Exp Edit Client Firm')
+  await openNew(page, f)
+  await fillExpense(page, { payee: 'Switch Co', amount: '19.73', client: 'Initech' })
+  await expect(page.getByLabel('Client')).toBeEnabled()
+  await page.getByLabel('Project').selectOption({ label: 'Portal' })
+  await expect(page.getByLabel('Client')).toBeDisabled()
+  await expect(page.getByLabel('Client')).toHaveValue(globex)
+  await page.getByRole('button', { name: 'Save expense' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Expense saved.' })).toBeVisible()
+  await page.reload()
+  await expect(page.getByLabel('Client')).toHaveValue(globex)
+  await expect(page.getByLabel('Project')).not.toHaveValue('')
+
+  // Clearing the project shows the stored client, now the project's.
+  await page.getByLabel('Project').selectOption({ label: 'No project' })
+  await expect(page.getByLabel('Client')).toBeEnabled()
+  await expect(page.getByLabel('Client')).toHaveValue(globex)
+})
+
+test('a page past the last goes to the last page', async ({ page }) => {
+  const { f } = await setup('Exp Paging Firm')
+  await openNew(page, f)
+  await fillExpense(page, { payee: 'Only Co', amount: '12.34' })
+  await page.goto(`/f/${f.firmId}/expenses?page=7`)
+  await expect(page).toHaveURL(/[?&]page=1(&|$)/)
+  await expect(page.getByRole('row', { name: /Only Co/ })).toBeVisible()
+  await expect(page.getByText('1 expense · $12.34')).toBeVisible()
 })

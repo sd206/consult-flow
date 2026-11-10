@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { FileList } from '@/components/attachments/file-list'
 import { FILE_ACCEPT, takeFiles, uploadFiles } from '@/components/attachments/upload-files'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { MAX_FILES_PER_UPLOAD, TOO_MANY_FILES } from '@/lib/domain/attachments'
 import { todayIso } from '@/lib/domain/dates'
 import { formatMoney } from '@/lib/domain/money'
 import type { FieldErrors, FormResult } from '@/lib/form'
+import { rejectedFilesParam } from '@/lib/domain/rejected-files'
 import {
   createExpenseForUploadAction,
   createExpenseUploadTargetsAction,
@@ -37,10 +38,6 @@ export type ExpenseValues = {
 
 const SOMETHING_WENT_WRONG = 'Something went wrong. Please try again.'
 const selectClass = 'h-8 rounded-lg border bg-background px-2 text-sm'
-
-function notAttached(names: string[]): string | null {
-  return names.length === 0 ? null : `Expense saved, but some receipts weren't attached: ${names.join(', ')}.`
-}
 
 function uploadReceipts(firmId: string, expenseId: string, files: File[]): Promise<string[]> {
   return uploadFiles(files, {
@@ -84,11 +81,21 @@ export function ExpenseForm({
   const [createErrors, setCreateErrors] = useState<FieldErrors>({})
   const [createError, setCreateError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  // One id per new-expense form: a retried save (lost response, double submit) can't create a second expense.
+  const newId = useRef<string | null>(null)
 
   const errors = expense ? run.errors : createErrors
   const error = expense ? run.error : createError
   const busy = expense ? run.pending : pending
   const categoryOptions = categories.filter((c) => c.active || c.id === expense?.categoryId)
+  const [projectId, setProjectId] = useState(expense?.projectId ?? '')
+  const project = projects.find((p) => p.id === projectId)
+  // With a project, the client is the project's (set by the database): shown, not chosen.
+  const clientValue = project ? project.clientId : (expense?.clientId ?? '')
+  const clientOptions =
+    project && !clients.some((c) => c.id === project.clientId)
+      ? [...clients, { id: project.clientId, name: project.clientName }]
+      : clients
 
   function submit(fd: FormData) {
     setSaved(false)
@@ -109,14 +116,16 @@ export function ExpenseForm({
           setCreateError(TOO_MANY_FILES)
           return
         }
+        newId.current ??= crypto.randomUUID()
+        fd.set('id', newId.current)
         const r = await createExpenseForUploadAction(firmId, fd)
         if (!r.ok) {
           setCreateErrors(r.fieldErrors ?? {})
           setCreateError(r.error)
           return
         }
-        const warning = notAttached(await uploadReceipts(firmId, r.data.id, files))
-        const q = warning ? `&fileWarning=${encodeURIComponent(warning)}` : ''
+        const failed = await uploadReceipts(firmId, r.data.id, files)
+        const q = failed.length > 0 ? `&filesRejected=${encodeURIComponent(rejectedFilesParam(failed))}` : ''
         router.push(`/f/${firmId}/expenses/${r.data.id}?added=1${q}`)
       } catch (e) {
         console.error('create expense failed', e)
@@ -185,14 +194,18 @@ export function ExpenseForm({
       <div className="flex flex-col gap-1">
         <Label htmlFor="exp-client">Client</Label>
         <select
+          // Re-created whenever the shown client changes: after a save the stored client is shown,
+          // and with a project the project's client is.
+          key={`${project ? 'project' : 'own'}:${clientValue}`}
           id="exp-client"
           name="clientId"
-          defaultValue={expense?.clientId ?? ''}
+          defaultValue={clientValue}
+          disabled={!!project}
           aria-invalid={!!errors.clientId}
           className={`${selectClass} max-w-64`}
         >
           <option value="">No client</option>
-          {clients.map((c) => (
+          {clientOptions.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
@@ -206,6 +219,7 @@ export function ExpenseForm({
           id="exp-project"
           name="projectId"
           defaultValue={expense?.projectId ?? ''}
+          onChange={(e) => setProjectId(e.currentTarget.value)}
           aria-invalid={!!errors.projectId}
           aria-describedby="exp-project-note"
           className={`${selectClass} max-w-64`}

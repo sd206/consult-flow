@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { requireFirmRole } from '@/lib/auth/context'
 import { isIsoDate, todayIso } from '@/lib/domain/dates'
 import { formatMoney } from '@/lib/domain/money'
@@ -73,6 +74,8 @@ export default async function ExpensesPage({
     q.set('page', String(page))
     return `${base}?${q.toString()}`
   }
+  // Past the last page (e.g. after deletes or a stale link): go to the last page, not an empty one.
+  if (list.ok && list.data.count > 0 && pageNo > list.data.pages) redirect(query(list.data.pages))
 
   return (
     <div className="max-w-6xl">
@@ -146,7 +149,7 @@ export default async function ExpensesPage({
       ) : (
         <>
           <p className="mt-4 text-sm font-medium">
-            {list.data.count} expenses · {formatMoney(list.data.total, opts.currency)}
+            {list.data.count} {list.data.count === 1 ? 'expense' : 'expenses'} · {formatMoney(list.data.total, opts.currency)}
           </p>
           {list.data.rows.length === 0 ? (
             <p className="mt-4 text-sm">No expenses match these filters.</p>

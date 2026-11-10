@@ -14,7 +14,7 @@ import {
   type UploadTarget,
 } from '@/modules/attachments/storage'
 import { createExpense, deleteExpense, updateExpense } from './data'
-import { expenseInputSchema } from './schemas'
+import { expenseInputSchema, newExpenseSchema } from './schemas'
 
 const MANAGERS = ['admin', 'manager'] as const
 
@@ -23,8 +23,8 @@ function revalidate(firmId: string, expenseId?: string) {
   if (expenseId) revalidatePath(`/f/${firmId}/expenses/${expenseId}`)
 }
 
-function parseForm(formData: FormData) {
-  return expenseInputSchema.safeParse({
+function fields(formData: FormData) {
+  return {
     spentOn: str(formData, 'spentOn'),
     categoryId: str(formData, 'categoryId'),
     payee: str(formData, 'payee'),
@@ -32,14 +32,23 @@ function parseForm(formData: FormData) {
     clientId: str(formData, 'clientId'),
     projectId: str(formData, 'projectId'),
     notes: str(formData, 'notes'),
-  })
+  }
+}
+
+function parseForm(formData: FormData) {
+  return expenseInputSchema.safeParse(fields(formData))
 }
 
 async function create(firmId: string, formData: FormData): Promise<FormResult<{ id: string }>> {
   const { db } = await requireFirmRole(firmId, [...MANAGERS])
-  const parsed = parseForm(formData)
-  if (!parsed.success) return fieldErrorsOf(parsed.error)
-  const created = await createExpense(db, firmId, parsed.data)
+  const parsed = newExpenseSchema.safeParse({ ...fields(formData), id: str(formData, 'id') })
+  if (!parsed.success) {
+    const bad = fieldErrorsOf(parsed.error)
+    // The id is not a field the user can fix: report it as a plain error.
+    return bad.fieldErrors?.id && Object.keys(bad.fieldErrors).length === 1 ? { ok: false, error: bad.fieldErrors.id } : bad
+  }
+  const { id, ...input } = parsed.data
+  const created = await createExpense(db, firmId, input, id)
   if (created.ok) revalidate(firmId)
   return created
 }

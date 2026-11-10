@@ -366,6 +366,29 @@ describe('expenses (database)', () => {
       const o = await totals(other.manager)
       expect(o.error?.code).toBe('42501')
     })
+
+    it('list_expenses: consultants and other firms get 42501, managers get rows', async () => {
+      const list = (u: Firm['manager']) =>
+        u.db.rpc('list_expenses', {
+          p_firm: t.firmId,
+          p_from: null,
+          p_to: null,
+          p_category: null,
+          p_client: null,
+          p_project: null,
+          p_missing_receipt: false,
+          p_limit: 50,
+          p_offset: 0,
+        })
+      const c = await list(t.consultant)
+      expect(c.error?.code).toBe('42501')
+      expect(c.data).toBeNull()
+      const o = await list(other.manager)
+      expect(o.error?.code).toBe('42501')
+      const m = await list(t.manager)
+      expect(m.error).toBeNull()
+      expect(m.data).toHaveLength(4)
+    })
   })
 
   describe('attachments', () => {
