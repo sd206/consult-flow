@@ -104,6 +104,21 @@ describe('receivables', () => {
     })
   })
 
+  it('a zero-total issued invoice is not unpaid and not overdue', async () => {
+    const g = await newFirm('Zero Total Firm')
+    const zero = await invoiceAt(g, 0, 10)
+    const { data } = await adminDb().from('invoices').select('status, total::text').eq('id', zero.invoiceId).single()
+    expect(data).toEqual({ status: 'issued', total: '0.00' })
+    expect(must(await listUnpaid(g.manager.db, g.firmId, null))).toEqual([])
+    const ageing = must(await getAgeing(g.manager.db, g.firmId, null))
+    expect(ageing.every((b) => b.invoiceCount === 0 && b.balanceDue === '0.00')).toBe(true)
+    expect(must(await getOutstandingSummary(g.manager.db, g.firmId))).toEqual({
+      outstanding: '0.00',
+      overdue: '0.00',
+      overdueCount: 0,
+    })
+  })
+
   it('empty firm returns zeros', async () => {
     const g = await newFirm('Empty')
     expect(must(await getOutstandingSummary(g.admin.db, g.firmId))).toEqual({
