@@ -718,6 +718,16 @@ isOneToOne: false
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
             }[]
                            },
+"pnl_facts":
+{ Args: { "p_firm": string,"p_from": string,"p_to": string }; Returns: {
+              "amount": number,"client_id": string,"fact_date": string,"measure": string,"project_id": string
+            }[]
+                           },
+"pnl_report":
+{ Args: { "p_clients": (string)[],"p_firm": string,"p_from": string,"p_group": string,"p_projects": (string)[],"p_to": string }; Returns: {
+              "collected": string,"direct_expenses": string,"discounts": string,"fees": string,"gross": string,"group_key": string,"invoiced": string,"label": string,"labour": string,"margin": string,"net": string,"overhead": string,"revenue": string,"revenue_hours": string,"row_kind": string,"sort_key": string
+            }[]
+                           },
 "record_payment":
 { Args: { "p_amount": number,"p_invoice": string,"p_method": Database["public"]['Enums']["payment_method"],"p_notes": string,"p_paid_on": string,"p_reference": string }; Returns: string
                            },

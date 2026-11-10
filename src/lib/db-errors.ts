@@ -77,6 +77,8 @@ const BY_MATCH: [string, string][] = [
   ['expenses_amount_chk', 'Enter an amount above 0.'],
   ['expenses_payee_chk', 'Enter who was paid (up to 200 characters).'],
   ['expenses_notes_chk', 'Keep notes to 1000 characters or fewer.'],
+  ['PNL_RANGE_INVALID', 'Choose an end date on or after the start date, within 3 years.'],
+  ['PNL_GROUP_INVALID', 'Choose how to group the report.'],
 ]
 
 /**

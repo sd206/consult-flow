@@ -162,6 +162,15 @@ describe('mapDbError', () => {
     expect(mapDbError(fkInsert('expenses_project_fk', 'projects'))).toBe('Project not found.')
   })
 
+  const pnlCases: [string, string][] = [
+    ['PNL_RANGE_INVALID', 'Choose an end date on or after the start date, within 3 years.'],
+    ['PNL_GROUP_INVALID', 'Choose how to group the report.'],
+  ]
+
+  it.each(pnlCases)('P&L error %s', (needle, expected) => {
+    expect(mapDbError({ code: 'P0001', message: `x ${needle} y` })).toBe(expected)
+  })
+
   it('maps a duplicate invoice number', () => {
     expect(mapDbError(unique('invoices_firm_number_key'))).toBe(
       'That invoice number is already used. Change the number pattern in Settings, then issue again.',
