@@ -99,12 +99,12 @@ npm run test:e2e    # Playwright; needs local Supabase running
   - **Margin %:** net profit as a percentage of revenue, blank when revenue is zero.
   - **Invoiced:** invoice subtotal minus discount, on the issue date. Tax is not included.
   - **Collected:** payments received, on the payment date, with the tax share removed in proportion to each invoice (a payment on an invoice that is 10% tax counts as the payment less that tax share). Voided invoices are ignored.
-- **Accrual:** hours are reported when the work was done, not when they are invoiced or paid. Fees, discounts and invoiced amounts follow the invoice issue date, and collected follows the payment date, so Invoiced and Collected can differ from Revenue in any one period.
+- **When things are counted:** hours are reported when the work was done, not when they are invoiced or paid. Fees, discounts and invoiced amounts follow the invoice issue date, and collected follows the payment date, so Invoiced and Collected can differ from Revenue in any one period.
 - **Overhead by grouping:** month and quarter rows include overhead (every month in the range is shown, even empty ones). Client and project groupings do not spread overhead across clients; it appears in a single "Unallocated overhead" row instead. Every view ends with a Total row.
-- **Filters drop overhead:** choosing any client or project filter removes overhead everywhere, including the Unallocated row, since overhead belongs to no client. A project filter also leaves out fees and discounts, which have a client but no project.
+- **Filters drop overhead:** choosing any client or project filter removes overhead everywhere, including the Unallocated row, since overhead belongs to no client. A project filter also leaves out anything not tied to a project: fees, discounts, invoiced and collected amounts, and expenses recorded against a client without a project.
 - **Project grouping:** rows are labelled "Client — Project". Fees, discounts, invoiced and collected amounts, and expenses that have a client but no project, appear in a "Client — no project" row for that client.
 - **Range limit:** more than 3 years between from and to is refused with "Choose a range of 3 years or less."
-- **CSV export:** the Export CSV button downloads the table as `pnl-{from}-to-{to}-by-{group}.csv`. It opens directly in Excel (UTF-8 with a byte-order mark). Amounts are plain numbers such as `1234.50`. Text starting with `=`, `+`, `-`, `@`, a tab or a line break gets a leading apostrophe, so a client named `=SUM(...)` cannot run as a spreadsheet formula.
+- **CSV export:** the Export CSV button downloads the table as `pnl-{from}-to-{to}-by-{group}.csv`. It opens correctly in Excel, including accented characters. Amounts are plain numbers such as `1234.50`. Text starting with `=`, `+`, `-`, `@`, a tab or a line break gets a leading apostrophe, so a client named `=SUM(...)` cannot run as a spreadsheet formula.
 
 ## File storage
 
