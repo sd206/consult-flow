@@ -85,6 +85,7 @@ export function PnlFilters({
 
       <fieldset className="space-y-2">
         <legend className="font-medium">Projects</legend>
+        <p className="text-muted-foreground">Projects narrow the selected clients</p>
         {groups.map((g) => (
           <div key={g.name} className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="text-muted-foreground">{g.name}</span>

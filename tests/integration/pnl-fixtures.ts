@@ -20,13 +20,13 @@ export type PnlIds = {
   invoiceBId: string | null
 }
 
-async function insertOne<T>(table: string, row: Record<string, unknown>): Promise<T> {
+export async function insertOne<T>(table: string, row: Record<string, unknown>): Promise<T> {
   const { data, error } = await adminDb().from(table).insert(row).select().single()
   if (error || !data) throw new Error(`${table} insert failed: ${error?.message}`)
   return data as T
 }
 
-async function rpc<T = unknown>(db: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<T> {
+export async function rpc<T = unknown>(db: SupabaseClient, fn: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await db.rpc(fn, args)
   if (error) throw new Error(`${fn} failed: ${error.message}`)
   return data as T
@@ -43,7 +43,7 @@ async function categoryId(firmId: string, name: string): Promise<string> {
   return (data as { id: string }).id
 }
 
-async function defaultTemplate(firmId: string): Promise<string> {
+export async function defaultTemplate(firmId: string): Promise<string> {
   const { data, error } = await adminDb()
     .from('invoice_templates')
     .select('id')
@@ -54,7 +54,7 @@ async function defaultTemplate(firmId: string): Promise<string> {
   return (data as { id: string }).id
 }
 
-async function saveAndSubmit(
+export async function saveAndSubmit(
   db: SupabaseClient,
   firmId: string,
   consultantId: string,

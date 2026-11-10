@@ -51,6 +51,17 @@ describe('buildPnlCsv', () => {
     expect(l[1].startsWith(`"'=HYPERLINK(""x"")",`)).toBe(true)
   })
 
+  it('prefixes a leading tab or carriage return, and quotes embedded line feeds', () => {
+    const raw = buildPnlCsv(
+      [mk({ label: '\tTabbed' }), mk({ label: '\rReturn' }), mk({ label: 'Line\nBreak' })],
+      params,
+    ).body
+    expect(raw).toContain("\r\n'\tTabbed,2300.00")
+    // A leading CR gets the apostrophe and, being a CR, the field is quoted.
+    expect(raw).toContain('\r\n"\'\rReturn",2300.00')
+    expect(raw).toContain('\r\n"Line\nBreak",2300.00')
+  })
+
   it('prefixes a leading dash in text but not in numbers', () => {
     const l = lines(buildPnlCsv([mk({ label: '-Odd', net: '-75.00' })], params).body)
     expect(l[1].startsWith("'-Odd,")).toBe(true)
@@ -70,5 +81,16 @@ describe('buildPnlCsv', () => {
 
   it('names the file', () => {
     expect(buildPnlCsv([], params).filename).toBe('pnl-2026-03-01-to-2026-05-31-by-month.csv')
+  })
+
+  it('marks a filtered export in the filename', () => {
+    const id = '11111111-1111-4111-8111-111111111111'
+    expect(buildPnlCsv([], { ...params, clientIds: [id] }).filename).toBe(
+      'pnl-2026-03-01-to-2026-05-31-by-month-filtered.csv',
+    )
+    expect(buildPnlCsv([], { ...params, group: 'client', projectIds: [id] }).filename).toBe(
+      'pnl-2026-03-01-to-2026-05-31-by-client-filtered.csv',
+    )
+    expect(buildPnlCsv([], { ...params, clientIds: [] }).filename).toBe('pnl-2026-03-01-to-2026-05-31-by-month.csv')
   })
 })

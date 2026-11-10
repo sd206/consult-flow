@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { getPnl } from '@/modules/reports/pnl'
 import { newFirm } from './helpers'
-import { seedPnlScenario, type PnlIds } from './pnl-fixtures'
+import { defaultTemplate, insertOne, rpc, saveAndSubmit, seedPnlScenario, type PnlIds } from './pnl-fixtures'
 
 type Firm = Awaited<ReturnType<typeof newFirm>>
 
@@ -424,5 +424,91 @@ describe('getPnl', () => {
 
     const denied = await getPnl(f.consultant.db, f.firmId, params)
     expect(denied).toEqual({ ok: false, error: "You don't have permission to do that." })
+  }, 60_000)
+})
+
+describe('pnl_report: margin on non-positive revenue', () => {
+  it('is null when displayed revenue is negative or zero', async () => {
+    // Hours-only invoice with a 10% discount: the discount has no project and no
+    // fees to offset it, so "Globex — no project" and April have negative revenue.
+    const f = await newFirm('PnL Margin Firm')
+    const ids = await seedPnlScenario(f, { invoices: false })
+    const template = await defaultTemplate(f.firmId)
+    const inv = await rpc<string>(f.manager.db, 'create_invoice_draft', {
+      p_firm: f.firmId,
+      p_client: ids.globexId,
+      p_start: '2026-03-01',
+      p_end: '2026-03-31',
+      p_template: template,
+      p_consultants: null,
+    })
+    await rpc(f.manager.db, 'set_invoice_discount', { p_invoice: inv, p_type: 'percent', p_value: 10, p_label: null })
+    await rpc(f.manager.db, 'update_invoice_draft', {
+      p_invoice: inv,
+      p_subject: null,
+      p_issue_date: '2026-04-10',
+      p_due_date: '2026-05-10',
+      p_tax_percent: 0,
+      p_template: template,
+    })
+    await rpc(f.manager.db, 'issue_invoice', { p_invoice: inv })
+
+    const byProject = await report(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'project')
+    expect(row(byProject, 'Globex — no project')).toMatchObject({ revenue: '-150.00', net: '-150.00', margin: null })
+    expect(row(byProject, 'Globex — Portal').margin).toBe('32.0')
+
+    const byMonth = await report(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'month')
+    expect(row(byMonth, 'Apr 2026')).toMatchObject({ revenue: '-150.00', net: '-225.00', margin: null })
+    expect(row(byMonth, 'Mar 2026').margin).toBe('32.2')
+  }, 60_000)
+})
+
+describe('pnl_report: sub-cent rounding', () => {
+  it('rounds each row separately and the total once from the exact sum', async () => {
+    // 0.33 h x 100.50 = 33.165 exact per entry, one entry in March and one in April.
+    //   revenue: each month rounds 33.165 -> 33.17; rows sum to 66.34; total is round(66.330) = 66.33
+    // 0.33 h x 10.01 cost = 3.3033 per entry.
+    //   labour: each month 3.30; rows sum to 6.60; total is round(6.6066) = 6.61
+    const f = await newFirm('PnL Rounding Firm')
+    const client = await insertOne<{ id: string }>('clients', { firm_id: f.firmId, name: 'Fraction Co' })
+    const project = await insertOne<{ id: string }>('projects', {
+      firm_id: f.firmId,
+      client_id: client.id,
+      name: 'Tiny',
+    })
+    const lee = await insertOne<{ id: string }>('consultants', {
+      firm_id: f.firmId,
+      name: 'Lee',
+      email: `lee-${crypto.randomUUID()}@test.local`,
+      type: 'employee',
+      user_id: null,
+    })
+    await insertOne('consultant_cost_rates', {
+      firm_id: f.firmId,
+      consultant_id: lee.id,
+      hourly_cost: '10.01',
+      effective_from: '2026-01-01',
+    })
+    await insertOne('project_assignments', {
+      firm_id: f.firmId,
+      project_id: project.id,
+      consultant_id: lee.id,
+      client_rate: '100.50',
+      effective_from: '2026-01-01',
+    })
+    for (const [week, day] of [
+      ['2026-03-02', '2026-03-03'],
+      ['2026-04-06', '2026-04-07'],
+    ]) {
+      const t = await saveAndSubmit(f.manager.db, f.firmId, lee.id, week, [
+        { projectId: project.id, workDate: day, hours: '0.33' },
+      ])
+      await rpc(f.manager.db, 'approve_timesheet', { p_timesheet: t })
+    }
+
+    const rows = await report(f.manager.db, f.firmId, '2026-03-01', '2026-04-30', 'month')
+    expect(row(rows, 'Mar 2026')).toMatchObject({ revenue: '33.17', labour: '3.30', gross: '29.87' })
+    expect(row(rows, 'Apr 2026')).toMatchObject({ revenue: '33.17', labour: '3.30', gross: '29.87' })
+    expect(row(rows, 'Total')).toMatchObject({ revenue: '66.33', labour: '6.61', gross: '59.72', net: '59.72' })
   }, 60_000)
 })

@@ -47,8 +47,9 @@ export function buildPnlCsv(rows: PnlRow[], params: PnlParams): { filename: stri
     ]
     lines.push([csvField(labelFor(r), { text: true }), ...nums.map((n) => csvField(n, { text: false }))].join(','))
   }
+  const filtered = (params.clientIds?.length ?? 0) > 0 || (params.projectIds?.length ?? 0) > 0
   return {
-    filename: `pnl-${params.from}-to-${params.to}-by-${params.group}.csv`,
+    filename: `pnl-${params.from}-to-${params.to}-by-${params.group}${filtered ? '-filtered' : ''}.csv`,
     body: `\uFEFF${lines.join('\r\n')}\r\n`,
   }
 }

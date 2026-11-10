@@ -36,12 +36,12 @@ test('by month: net, margin, overhead and total', async ({ page }) => {
   await openReport(page, f)
   await show(page, 'Month')
   const mar = page.getByRole('row', { name: /Mar 2026/ })
-  await expect(mar.getByRole('cell').nth(6)).toHaveText('$740.00')
-  await expect(mar.getByRole('cell').nth(7)).toHaveText('32.2%')
+  await expect(mar.getByRole('cell').nth(5)).toHaveText('$740.00')
+  await expect(mar.getByRole('cell').nth(6)).toHaveText('32.2%')
   const apr = page.getByRole('row', { name: /Apr 2026/ })
-  await expect(apr.getByRole('cell').nth(5)).toHaveText('$75.00')
+  await expect(apr.getByRole('cell').nth(4)).toHaveText('$75.00')
   const total = page.getByRole('row', { name: /^Total/ })
-  await expect(total.getByRole('cell').nth(6)).toHaveText('$785.00')
+  await expect(total.getByRole('cell').nth(5)).toHaveText('$785.00')
 })
 
 test('by client: client rows, unallocated overhead, invoiced and collected', async ({ page }) => {
@@ -54,6 +54,12 @@ test('by client: client rows, unallocated overhead, invoiced and collected', asy
   const globex = page.getByRole('row', { name: /^Globex/ })
   await expect(globex.getByRole('cell').nth(7)).toHaveText('$1,620.00')
   await expect(globex.getByRole('cell').nth(8)).toHaveText('$923.79')
+  // Overhead is always a column; client rows show a dash, the unallocated and total rows show the amount.
+  await expect(globex.getByRole('cell').nth(4)).toHaveText('—')
+  const unallocated = page.getByRole('row', { name: /^Unallocated overhead/ })
+  await expect(unallocated.getByRole('cell').nth(3)).toHaveText('—')
+  await expect(unallocated.getByRole('cell').nth(4)).toHaveText('$75.00')
+  await expect(page.getByRole('row', { name: /^Total/ }).getByRole('cell').nth(4)).toHaveText('$75.00')
 })
 
 test('filtering to Globex removes the overhead row', async ({ page }) => {
@@ -66,6 +72,10 @@ test('filtering to Globex removes the overhead row', async ({ page }) => {
   await expect(page.getByRole('row', { name: /^Globex/ })).toBeVisible()
   await expect(page.getByRole('row', { name: /^Initech/ })).toHaveCount(0)
   await expect(page.getByRole('row', { name: /Unallocated overhead/ })).toHaveCount(0)
+  await expect(page.getByText('Overhead is excluded while a client or project filter is applied.')).toBeVisible()
+  const href = await page.getByRole('link', { name: 'Export CSV' }).getAttribute('href')
+  const res = await page.request.get(href!)
+  expect(res.headers()['content-disposition']).toContain('-by-client-filtered.csv')
 })
 
 test('export CSV link downloads the report', async ({ page }) => {
@@ -83,6 +93,14 @@ test('export CSV link downloads the report', async ({ page }) => {
   )
   expect(body).toContain('Total')
   expect(body).toContain('785.00')
+})
+
+test('the CSV rejects a reversed range with 400 and the message', async ({ page }) => {
+  const { f } = await setup('Pnl Range Firm')
+  await login(page, f.manager.email)
+  const res = await page.request.get(`/f/${f.firmId}/reports/pnl/csv?from=2026-05-01&to=2026-04-01`)
+  expect(res.status()).toBe(400)
+  expect(await res.text()).toBe('Choose an end date on or after the start date, within 3 years.')
 })
 
 test('a consultant gets 404 on the page and the CSV', async ({ page }) => {
