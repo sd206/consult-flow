@@ -611,6 +611,11 @@ isOneToOne: false
               "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string
             }[]
                            },
+"outstanding_summary":
+{ Args: { "p_firm": string }; Returns: {
+              "outstanding": string,"overdue": string,"overdue_count": number
+            }[]
+                           },
 "payment_lock":
 { Args: { "p_missing": string,"p_payment": string }; Returns: {
               "amount": number,
@@ -685,6 +690,16 @@ isOneToOne: false
 "timesheet_totals":
 { Args: { "p_firm": string,"p_ids": (string)[] }; Returns: {
               "timesheet_id": string,"total_hours": string
+            }[]
+                           },
+"unpaid_ageing":
+{ Args: { "p_client": string,"p_firm": string }; Returns: {
+              "balance_due": string,"bucket": string,"invoice_count": number
+            }[]
+                           },
+"unpaid_invoices":
+{ Args: { "p_client": string,"p_firm": string }; Returns: {
+              "amount_paid": string,"balance_due": string,"client_id": string,"client_name": string,"days_overdue": number,"due_date": string,"invoice_id": string,"issue_date": string,"number": string,"total": string
             }[]
                            },
 "update_invoice_draft":
