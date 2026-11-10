@@ -26,7 +26,7 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
     )
   }
 
-  const [summary, firm] = await Promise.all([getDashboardSummary(db, firmId), getFirm(db, firmId)])
+  const [summary, firm] = await Promise.all([getDashboardSummary(db, firmId, role), getFirm(db, firmId)])
   const currency = firm.ok ? firm.data.currency : 'USD'
   const isAdmin = role === 'admin'
 
