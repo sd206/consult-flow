@@ -136,6 +136,32 @@ describe('mapDbError', () => {
     expect(mapDbError(fkInsert('invoices_client_fk', 'clients'))).toBe('Client not found.')
   })
 
+  const expenseCases: [string, string][] = [
+    ['EXPENSE_NOT_FOUND', 'Expense not found.'],
+    ['EXPENSE_FUTURE', "The expense date can't be in the future."],
+    ['CATEGORY_RETIRED', 'That category is retired. Pick another or restore it.'],
+    ['expense_categories_firm_name_key', 'A category with that name already exists.'],
+    ['expense_categories_name_chk', 'Enter a category name (up to 60 characters).'],
+    ['expenses_amount_chk', 'Enter an amount above 0.'],
+    ['expenses_payee_chk', 'Enter who was paid (up to 200 characters).'],
+    ['expenses_notes_chk', 'Keep notes to 1000 characters or fewer.'],
+  ]
+
+  it.each(expenseCases)('expense error %s', (needle, expected) => {
+    expect(mapDbError({ code: 'P0001', message: `x ${needle} y` })).toBe(expected)
+  })
+
+  it('splits expense foreign key errors into delete and missing-row messages', () => {
+    expect(mapDbError(fkDelete('expenses_category_fk', 'expense_categories'))).toBe(
+      "This category has expenses, so it can't be deleted. Retire it instead.",
+    )
+    expect(mapDbError(fkInsert('expenses_category_fk', 'expense_categories'))).toBe('Category not found.')
+    expect(mapDbError(fkDelete('expenses_client_fk', 'clients'))).toBe("This client has expenses, so it can't be deleted.")
+    expect(mapDbError(fkInsert('expenses_client_fk', 'clients'))).toBe('Client not found.')
+    expect(mapDbError(fkDelete('expenses_project_fk', 'projects'))).toBe("This project has expenses, so it can't be deleted.")
+    expect(mapDbError(fkInsert('expenses_project_fk', 'projects'))).toBe('Project not found.')
+  })
+
   it('maps a duplicate invoice number', () => {
     expect(mapDbError(unique('invoices_firm_number_key'))).toBe(
       'That invoice number is already used. Change the number pattern in Settings, then issue again.',

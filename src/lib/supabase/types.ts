@@ -25,17 +25,23 @@ export type Database = {
           Tables: {
             "attachments": {
                   Row: {
-                    "created_at": string,"created_by": string | null,"file_name": string,"firm_id": string,"id": string,"mime_type": string,"payment_id": string | null,"size_bytes": number,"storage_path": string,"updated_at": string
+                    "created_at": string,"created_by": string | null,"expense_id": string | null,"file_name": string,"firm_id": string,"id": string,"mime_type": string,"payment_id": string | null,"size_bytes": number,"storage_path": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "created_at"?: string,"created_by"?: string | null,"file_name": string,"firm_id": string,"id"?: string,"mime_type": string,"payment_id"?: string | null,"size_bytes": number,"storage_path": string,"updated_at"?: string
+                    "created_at"?: string,"created_by"?: string | null,"expense_id"?: string | null,"file_name": string,"firm_id": string,"id"?: string,"mime_type": string,"payment_id"?: string | null,"size_bytes": number,"storage_path": string,"updated_at"?: string
                   }
                   Update: {
-                    "created_at"?: string,"created_by"?: string | null,"file_name"?: string,"firm_id"?: string,"id"?: string,"mime_type"?: string,"payment_id"?: string | null,"size_bytes"?: number,"storage_path"?: string,"updated_at"?: string
+                    "created_at"?: string,"created_by"?: string | null,"expense_id"?: string | null,"file_name"?: string,"firm_id"?: string,"id"?: string,"mime_type"?: string,"payment_id"?: string | null,"size_bytes"?: number,"storage_path"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
+      foreignKeyName: "attachments_expense_fk"
+      columns: ["firm_id","expense_id"]
+isOneToOne: false
+      referencedRelation: "expenses"
+      referencedColumns: ["firm_id","id"]
+    },{
       foreignKeyName: "attachments_firm_id_fkey"
       columns: ["firm_id"]
 isOneToOne: false
@@ -150,6 +156,64 @@ isOneToOne: false
       columns: ["firm_id","vendor_id"]
 isOneToOne: false
       referencedRelation: "vendors"
+      referencedColumns: ["firm_id","id"]
+    }
+                  ]
+                },"expense_categories": {
+                  Row: {
+                    "active": boolean,"created_at": string,"created_by": string | null,"firm_id": string,"id": string,"name": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"firm_id": string,"id"?: string,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "active"?: boolean,"created_at"?: string,"created_by"?: string | null,"firm_id"?: string,"id"?: string,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expense_categories_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"expenses": {
+                  Row: {
+                    "amount": number,"category_id": string,"client_id": string | null,"created_at": string,"created_by": string | null,"firm_id": string,"id": string,"notes": string | null,"payee": string,"project_id": string | null,"spent_on": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "amount": number,"category_id": string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"firm_id": string,"id"?: string,"notes"?: string | null,"payee": string,"project_id"?: string | null,"spent_on": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "amount"?: number,"category_id"?: string,"client_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"firm_id"?: string,"id"?: string,"notes"?: string | null,"payee"?: string,"project_id"?: string | null,"spent_on"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "expenses_category_fk"
+      columns: ["firm_id","category_id"]
+isOneToOne: false
+      referencedRelation: "expense_categories"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "expenses_client_fk"
+      columns: ["firm_id","client_id"]
+isOneToOne: false
+      referencedRelation: "clients"
+      referencedColumns: ["firm_id","id"]
+    },{
+      foreignKeyName: "expenses_firm_id_fkey"
+      columns: ["firm_id"]
+isOneToOne: false
+      referencedRelation: "firms"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "expenses_project_fk"
+      columns: ["firm_id","project_id"]
+isOneToOne: false
+      referencedRelation: "projects"
       referencedColumns: ["firm_id","id"]
     }
                   ]
@@ -489,7 +553,10 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "add_firm_member":
+            "add_expense_attachment":
+{ Args: { "p_expense": string,"p_file_name": string,"p_mime": string,"p_size": number,"p_storage_path": string }; Returns: string
+                           },
+"add_firm_member":
 { Args: { "p_firm": string,"p_role": Database["public"]['Enums']["firm_role"],"p_user": string }; Returns: string
                            },
 "add_payment_attachment":
@@ -521,6 +588,11 @@ isOneToOne: false
                            },
 "delete_payment":
 { Args: { "p_payment": string }; Returns: string[]
+                           },
+"expense_totals":
+{ Args: { "p_category": string,"p_client": string,"p_firm": string,"p_from": string,"p_missing_receipt": boolean,"p_project": string,"p_to": string }; Returns: {
+              "expense_count": number,"total": string
+            }[]
                            },
 "format_invoice_number":
 { Args: { "p_issue": string,"p_pattern": string,"p_seq": number }; Returns: string

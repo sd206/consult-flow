@@ -69,6 +69,14 @@ const BY_MATCH: [string, string][] = [
   ['attachments_path_chk', "That file doesn't belong here."],
   ['attachments_size_chk', 'Each file must be 10 MB or smaller.'],
   ['attachments_mime_chk', 'Only PDF, PNG, JPEG or HEIC files can be attached.'],
+  ['EXPENSE_NOT_FOUND', 'Expense not found.'],
+  ['EXPENSE_FUTURE', "The expense date can't be in the future."],
+  ['CATEGORY_RETIRED', 'That category is retired. Pick another or restore it.'],
+  ['expense_categories_firm_name_key', 'A category with that name already exists.'],
+  ['expense_categories_name_chk', 'Enter a category name (up to 60 characters).'],
+  ['expenses_amount_chk', 'Enter an amount above 0.'],
+  ['expenses_payee_chk', 'Enter who was paid (up to 200 characters).'],
+  ['expenses_notes_chk', 'Keep notes to 1000 characters or fewer.'],
 ]
 
 /**
@@ -79,6 +87,9 @@ const BY_MATCH: [string, string][] = [
 const BY_FK: [string, string, string][] = [
   ['invoices_template_fk', "This template is used by invoices, so it can't be deleted.", 'Template not found.'],
   ['invoices_client_fk', "This client has invoices, so it can't be deleted.", 'Client not found.'],
+  ['expenses_category_fk', "This category has expenses, so it can't be deleted. Retire it instead.", 'Category not found.'],
+  ['expenses_client_fk', "This client has expenses, so it can't be deleted.", 'Client not found.'],
+  ['expenses_project_fk', "This project has expenses, so it can't be deleted.", 'Project not found.'],
 ]
 
 export function mapDbError(err: DbError | null): string {
