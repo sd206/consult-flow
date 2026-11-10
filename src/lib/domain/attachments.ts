@@ -2,6 +2,9 @@ import { fail, ok, type Result } from '@/lib/result'
 
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
 export const MAX_FILES_PER_UPLOAD = 5
+export const EMPTY_FILE = 'That file is empty.'
+export const FILE_TOO_LARGE = 'Each file must be 10 MB or smaller.'
+export const TOO_MANY_FILES = 'Attach up to 5 files at a time.'
 
 export type AttachmentKind = 'pdf' | 'png' | 'jpeg' | 'heic'
 export type AttachmentInfo = { kind: AttachmentKind; ext: 'pdf' | 'png' | 'jpg' | 'heic'; mime: string }
@@ -36,9 +39,9 @@ export function validateAttachment(file: {
   bytes: Uint8Array
 }): Result<AttachmentInfo> {
   // The buffer is what gets stored, so its real length counts, not just the declared size.
-  if (file.size <= 0 || file.bytes.length === 0) return fail('That file is empty.')
+  if (file.size <= 0 || file.bytes.length === 0) return fail(EMPTY_FILE)
   if (Math.max(file.size, file.bytes.length) > MAX_ATTACHMENT_BYTES) {
-    return fail('Each file must be 10 MB or smaller.')
+    return fail(FILE_TOO_LARGE)
   }
   const info = detect(file.bytes)
   if (!info) return fail('Only PDF, PNG, JPEG or HEIC files can be attached.')
@@ -49,5 +52,6 @@ export function validateAttachment(file: {
 export function displayFileName(name: string): string {
   const cleaned = name.replace(/[\u0000-\u001f\u007f]/g, '')
   const base = cleaned.split(/[/\\]/).pop() ?? ''
-  return base.trim().slice(0, 120) || 'file'
+  // Cut by code point so an emoji is never split into a lone surrogate.
+  return Array.from(base.trim()).slice(0, 120).join('').trim() || 'file'
 }

@@ -95,4 +95,11 @@ describe('displayFileName', () => {
     expect(displayFileName('   ')).toBe('file')
     expect(displayFileName('dir/')).toBe('file')
   })
+
+  it('cuts by code point, never splitting an emoji, then trims', () => {
+    const out = displayFileName(`${'a'.repeat(119)}😀rest.pdf`)
+    expect(Array.from(out)).toHaveLength(120)
+    expect(out.endsWith('😀')).toBe(true)
+    expect(displayFileName(`${'b'.repeat(118)}  tail.pdf`)).toBe('b'.repeat(118))
+  })
 })
