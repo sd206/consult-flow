@@ -37,7 +37,7 @@ export type ExpenseValues = {
 }
 
 const SOMETHING_WENT_WRONG = 'Something went wrong. Please try again.'
-const selectClass = 'h-8 rounded-lg border bg-background px-2 text-sm'
+const selectClass = 'h-8 rounded-lg border bg-card px-2 text-sm'
 
 function uploadReceipts(firmId: string, expenseId: string, files: File[]): Promise<string[]> {
   return uploadFiles(files, {
@@ -248,7 +248,7 @@ export function ExpenseForm({
           rows={3}
           defaultValue={expense?.notes ?? ''}
           aria-invalid={!!errors.notes}
-          className="rounded-lg border bg-transparent px-2.5 py-1 text-sm"
+          className="rounded-lg border bg-card px-2.5 py-1 text-sm"
         />
         <FieldError message={errors.notes} />
       </div>

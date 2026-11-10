@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { firmNav } from './nav'
 import { newFirm, TEST_PASSWORD } from '../integration/helpers'
 
 // Local Supabase delivers auth email to Mailpit (supabase/config.toml [inbucket]).
@@ -51,7 +52,7 @@ test('invited new user follows the email link, sets a password and lands in the 
   await page.getByLabel('New password').fill('a-brand-new-password')
   await page.getByRole('button', { name: 'Save password' }).click()
   await expect(page).toHaveURL(new RegExp(`/f/${f.firmId}$`))
-  await expect(page.getByRole('navigation').getByRole('link', { name: 'My projects' })).toBeVisible()
+  await expect(firmNav(page).getByRole('button', { name: 'Work' })).toBeVisible()
 
   // The link is single use.
   await page.context().clearCookies()
@@ -72,7 +73,7 @@ test('existing user signs in with an emailed magic link', async ({ page }) => {
 
   await page.goto(link)
   await expect(page).toHaveURL(new RegExp(`/f/${f.firmId}$`))
-  await expect(page.getByRole('navigation').getByRole('link', { name: 'My projects' })).toBeVisible()
+  await expect(firmNav(page).getByRole('button', { name: 'Work' })).toBeVisible()
 })
 
 test('confirm links with a bad token or type go to the login error', async ({ page }) => {

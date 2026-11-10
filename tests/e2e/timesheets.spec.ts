@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { goTo } from './nav'
 import { addDays, currentWeekStart, formatDayLabel } from '../../src/lib/domain/weeks'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 import { PAST_WEEK, seedTimesheetFixture } from '../integration/timesheet-fixtures'
@@ -30,7 +31,7 @@ test.describe('weekly timesheet grid', () => {
     await seed(f)
     await login(page, f.consultant.email)
     await page.goto(`/f/${f.firmId}`)
-    await page.getByRole('link', { name: 'My timesheet' }).first().click()
+    await goTo(page, 'Work', 'My timesheet')
     await expect(page.getByRole('heading', { name: `Week of ${formatDayLabel(mon)}` })).toBeVisible()
 
     await hours(page, mon).fill('8')
@@ -90,7 +91,7 @@ test.describe('weekly timesheet grid', () => {
     const f = await newFirm('Grid Unlinked Firm')
     await login(page, f.manager.email)
     await page.goto(`/f/${f.firmId}`)
-    await page.getByRole('link', { name: 'My timesheet' }).first().click()
+    await goTo(page, 'Work', 'My timesheet')
     await expect(
       page.getByText("Your login isn't linked to a consultant record yet. Ask an Admin to link it."),
     ).toBeVisible()
@@ -178,7 +179,7 @@ test.describe('manager timesheet review', () => {
     const mPage = await (await browser.newContext()).newPage()
     await login(mPage, f.manager.email)
     await mPage.goto(`/f/${f.firmId}`)
-    await mPage.getByRole('link', { name: 'Timesheets' }).first().click()
+    await goTo(mPage, 'Work', 'Timesheet approvals')
     const queue = mPage.getByRole('region', { name: 'Awaiting approval' })
     const row = queue.getByRole('row', { name: /Con Sultant/ })
     await expect(row).toBeVisible()
@@ -190,7 +191,7 @@ test.describe('manager timesheet review', () => {
     const cPage = await (await browser.newContext()).newPage()
     await login(cPage, f.consultant.email)
     await cPage.goto(`/f/${f.firmId}`)
-    await cPage.getByRole('link', { name: 'My timesheet' }).first().click()
+    await goTo(cPage, 'Work', 'My timesheet')
     await expect(cPage.getByText('Changes requested:')).toBeVisible()
     await expect(cPage.getByText('Split hours by task')).toBeVisible()
     await expect(hours(cPage, mon)).toBeEditable()

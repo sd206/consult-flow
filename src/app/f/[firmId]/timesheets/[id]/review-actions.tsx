@@ -56,7 +56,7 @@ export function ReviewActions({
               required
               rows={3}
               aria-invalid={!!commentError}
-              className="rounded-md border bg-background p-2 text-sm"
+              className="rounded-md border bg-card p-2 text-sm"
             />
             {commentError && <p className="text-xs text-destructive">{commentError}</p>}
             <div>

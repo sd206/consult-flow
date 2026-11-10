@@ -39,6 +39,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-selected: var(--selected);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,24 +53,30 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  /* Brand palette */
+  --brand: #142d4e; /* deep navy: header, logo, prominent headings */
+  --brand-foreground: #ffffff;
+  --primary-hover: #115e59; /* dark teal: hover and pressed */
+  --selected: #f0fdfa; /* pale teal: selected navigation item, light highlights */
+
+  --background: #f8fafc; /* cool off-white app background */
+  --foreground: #0f172a; /* slate main text */
+  --card: #ffffff; /* content surfaces */
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f766e; /* deep teal primary action */
+  --primary-foreground: #ffffff;
+  --secondary: #f0fdfa;
+  --secondary-foreground: #0f766e;
+  --muted: #f1f5f9;
+  --muted-foreground: #475569; /* muted slate secondary text */
+  --accent: #f0fdfa;
+  --accent-foreground: #0f766e;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #e2e8f0; /* light gray decorative dividers */
+  --input: #64748b; /* medium slate input outlines */
+  --ring: #0f766e;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -126,5 +136,29 @@
   }
   html {
     @apply font-sans;
+  }
+  h1 {
+    color: var(--brand);
+  }
+  /* Plain text links in page content are teal; buttons styled as links (they carry a
+     bg- class) keep their own colours. This lives in the base layer, so any text-*
+     utility class on a link still wins. */
+  main a:not([class*='bg-']) {
+    color: var(--primary);
+  }
+  main a:not([class*='bg-']):hover {
+    color: var(--primary-hover);
+  }
+  /* Form controls: medium slate outline (it identifies the control) on a white surface.
+     Base layer, so utility classes on a specific control still win. */
+  select,
+  textarea,
+  input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='color']) {
+    border-color: var(--input);
+    background-color: var(--card);
+  }
+  /* Tables sit on a white content surface against the off-white background. */
+  table {
+    background-color: var(--card);
   }
 }

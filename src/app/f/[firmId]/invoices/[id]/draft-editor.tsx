@@ -20,7 +20,7 @@ import { useRun } from '@/components/use-run'
 export type ConsultantOption = { id: string; name: string; checked: boolean }
 export type TemplateOption = { id: string; name: string }
 
-const select = 'h-8 rounded-lg border bg-background px-2 text-sm'
+const select = 'h-8 rounded-lg border bg-card px-2 text-sm'
 
 function HeaderForm({
   firmId,

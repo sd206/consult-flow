@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { goTo } from './nav'
 import { test, expect, type Page } from '@playwright/test'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 
@@ -33,7 +34,7 @@ async function setup(name: string) {
 async function openNew(page: Page, f: Firm) {
   await login(page, f.manager.email)
   await page.goto(`/f/${f.firmId}`)
-  await page.getByRole('link', { name: 'Expenses', exact: true }).click()
+  await goTo(page, 'Billing', 'Expenses')
   await page.getByRole('link', { name: 'New expense' }).click()
   await expect(page.getByRole('heading', { name: 'New expense' })).toBeVisible()
 }

@@ -24,7 +24,7 @@ export function DiscountForm({ firmId, invoice }: { firmId: string; invoice: Inv
           id="disc-type"
           name="type"
           defaultValue={invoice.discountType}
-          className="h-8 rounded-lg border bg-background px-2 text-sm"
+          className="h-8 rounded-lg border bg-card px-2 text-sm"
         >
           <option value="none">No discount</option>
           <option value="percent">Percentage</option>

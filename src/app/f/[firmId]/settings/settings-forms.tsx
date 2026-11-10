@@ -12,7 +12,7 @@ import {
 } from '@/modules/firms/actions'
 import type { Firm } from '@/modules/firms/data'
 
-const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-background px-2 text-sm'
+const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-card px-2 text-sm'
 
 function FieldError({ id, message }: { id: string; message?: string }) {
   if (!message) return null
@@ -93,7 +93,7 @@ export function SettingsForm({
           defaultValue={firm.address}
           aria-invalid={!!fe.address}
           aria-describedby={err('address')}
-          className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm"
+          className="rounded-lg border border-input bg-card px-2.5 py-1.5 text-sm"
         />
         <FieldError id="address-error" message={fe.address} />
       </div>

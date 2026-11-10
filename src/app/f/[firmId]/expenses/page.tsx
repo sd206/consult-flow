@@ -8,7 +8,7 @@ import { loadFormOptions } from './form-data'
 
 const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'
-const select = 'h-8 rounded-lg border bg-background px-2 text-sm'
+const select = 'h-8 rounded-lg border bg-card px-2 text-sm'
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const button = 'inline-flex h-8 items-center rounded-lg px-2.5 text-sm font-medium'
 
@@ -85,7 +85,7 @@ export default async function ExpensesPage({
           <Link href={`${base}/categories`} className={`${button} border`}>
             Categories
           </Link>
-          <Link href={`${base}/new`} className={`${button} bg-primary text-primary-foreground`}>
+          <Link href={`${base}/new`} className={`${button} bg-primary text-primary-foreground hover:bg-primary-hover`}>
             New expense
           </Link>
         </div>

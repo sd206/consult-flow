@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { goTo } from './nav'
 import { newFirm, TEST_PASSWORD } from '../integration/helpers'
 import { seedPnlScenario } from '../integration/pnl-fixtures'
 
@@ -19,7 +20,7 @@ async function setup(name: string) {
 async function openReport(page: Page, f: Awaited<ReturnType<typeof newFirm>>) {
   await login(page, f.manager.email)
   await page.goto(`/f/${f.firmId}`)
-  await page.getByRole('navigation', { name: 'Firm' }).getByRole('link', { name: 'Reports', exact: true }).click()
+  await goTo(page, 'Reports', 'Profit & loss')
   await expect(page).toHaveURL(/\/reports\/pnl/)
   await page.getByLabel('From').fill('2026-03-01')
   await page.getByLabel('To').fill('2026-05-31')

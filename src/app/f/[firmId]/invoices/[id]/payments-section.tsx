@@ -30,7 +30,7 @@ const METHOD_LABEL: Record<string, string> = {
 }
 const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'
-const select = 'h-8 rounded-lg border bg-background px-2 text-sm'
+const select = 'h-8 rounded-lg border bg-card px-2 text-sm'
 const TOO_MANY = { ok: false as const, error: TOO_MANY_FILES, fieldErrors: { files: TOO_MANY_FILES } }
 
 function uploadPaymentFiles(firmId: string, invoiceId: string, paymentId: string, files: File[]): Promise<string[]> {

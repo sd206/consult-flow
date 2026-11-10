@@ -34,7 +34,7 @@ export default async function InvoicesPage({
           </Link>
           <Link
             href={`${base}/new`}
-            className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground"
+            className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 hover:bg-primary-hover text-sm font-medium text-primary-foreground"
           >
             New invoice
           </Link>

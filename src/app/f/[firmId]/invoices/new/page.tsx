@@ -9,7 +9,7 @@ import { listTemplates } from '@/modules/invoice-templates/data'
 import { listCandidates, type Candidate } from '@/modules/invoices/data'
 import { BuilderForm } from './builder-form'
 
-const select = 'h-8 rounded-lg border bg-background px-2 text-sm'
+const select = 'h-8 rounded-lg border bg-card px-2 text-sm'
 
 /** First and last day of the previous calendar month (UTC). */
 function previousMonth(now = new Date()): { start: string; end: string } {

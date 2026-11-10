@@ -14,7 +14,7 @@ import {
   updateProjectAction,
 } from '@/modules/projects/actions'
 
-const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-background px-2 text-sm'
+const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-card px-2 text-sm'
 const STATUSES: { value: ProjectStatus; label: string }[] = [
   { value: 'active', label: 'Active' },
   { value: 'on_hold', label: 'On hold' },

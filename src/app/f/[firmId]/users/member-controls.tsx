@@ -13,7 +13,7 @@ import {
 } from '@/modules/members/actions'
 
 const ROLES: FirmRole[] = ['admin', 'manager', 'consultant']
-const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-background px-2 text-sm'
+const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-card px-2 text-sm'
 
 function ErrorLine({ state }: { state: Result<unknown> | null }) {
   if (!state || state.ok) return null

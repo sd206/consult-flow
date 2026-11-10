@@ -3,7 +3,7 @@ import type { PnlParams } from '@/modules/reports/pnl'
 type ClientOpt = { id: string; name: string }
 type ProjectOpt = { id: string; name: string; clientId: string; clientName: string }
 
-const input = 'h-8 rounded-lg border bg-background px-2 text-sm'
+const input = 'h-8 rounded-lg border bg-card px-2 text-sm'
 const button = 'inline-flex h-8 items-center rounded-lg px-2.5 text-sm font-medium'
 
 const GROUPS: { value: PnlParams['group']; label: string }[] = [
@@ -63,7 +63,7 @@ export function PnlFilters({
             ))}
           </select>
         </div>
-        <button type="submit" className={`${button} bg-primary text-primary-foreground`}>
+        <button type="submit" className={`${button} bg-primary text-primary-foreground hover:bg-primary-hover`}>
           Show report
         </button>
         <a href={`/f/${firmId}/reports/pnl/csv${exportQuery ? `?${exportQuery}` : ''}`} className={`${button} border`}>

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { firmNav, openMenu } from './nav'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 
 type Fixture = Awaited<ReturnType<typeof newFirm>>
@@ -23,15 +24,19 @@ test('unauthenticated visit to / lands on /login', async ({ page }) => {
 twoFirms('consultant logs in and sees only consultant nav', async ({ page, a }) => {
   await login(page, a.consultant.email)
   await expect(page).toHaveURL(new RegExp(`/f/${a.firmId}$`))
-  const nav = page.getByRole('navigation')
-  await expect(nav.getByRole('link', { name: 'My projects' })).toBeVisible()
+  const nav = firmNav(page)
   await expect(nav.getByRole('link', { name: 'Dashboard' })).toBeVisible()
-  await expect(nav.getByRole('link', { name: 'Clients' })).toHaveCount(0)
+  await expect(nav.getByRole('button', { name: 'Billing' })).toHaveCount(0)
+  await expect(nav.getByRole('button', { name: 'Setup' })).toHaveCount(0)
+  await openMenu(page, 'Work')
+  await expect(nav.getByRole('link', { name: 'My projects' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'Timesheet approvals' })).toHaveCount(0)
 })
 
 twoFirms('manager sees Clients but not Users', async ({ page, a }) => {
   await login(page, a.manager.email)
-  const nav = page.getByRole('navigation')
+  const nav = firmNav(page)
+  await openMenu(page, 'Setup')
   await expect(nav.getByRole('link', { name: 'Clients' })).toBeVisible()
   await expect(nav.getByRole('link', { name: 'Users' })).toHaveCount(0)
 })

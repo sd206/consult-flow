@@ -69,7 +69,7 @@ export function TemplateForm({ firmId, listHref, template }: { firmId: string; l
           id="tpl-layout"
           name="baseLayout"
           defaultValue={template.baseLayout}
-          className="h-8 rounded-lg border bg-background px-2 text-sm"
+          className="h-8 rounded-lg border bg-card px-2 text-sm"
         >
           <option value="classic">Classic</option>
           <option value="modern">Modern</option>
@@ -119,7 +119,7 @@ export function TemplateForm({ firmId, listHref, template }: { firmId: string; l
           rows={3}
           defaultValue={o.paymentTermsText}
           aria-invalid={!!errors.paymentTermsText}
-          className="rounded-md border bg-background p-2 text-sm"
+          className="rounded-md border bg-card p-2 text-sm"
         />
         {errors.paymentTermsText && <p className="text-xs text-destructive">{errors.paymentTermsText}</p>}
       </div>
@@ -132,7 +132,7 @@ export function TemplateForm({ firmId, listHref, template }: { firmId: string; l
           rows={2}
           defaultValue={o.footerText}
           aria-invalid={!!errors.footerText}
-          className="rounded-md border bg-background p-2 text-sm"
+          className="rounded-md border bg-card p-2 text-sm"
         />
         {errors.footerText && <p className="text-xs text-destructive">{errors.footerText}</p>}
       </div>

@@ -16,7 +16,7 @@ import {
   updateConsultantAction,
 } from '@/modules/consultants/actions'
 
-const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-background px-2 text-sm'
+const SELECT_CLASS = 'h-8 rounded-lg border border-input bg-card px-2 text-sm'
 const TYPES: ConsultantType[] = ['employee', 'independent', 'vendor']
 
 export type VendorOption = { id: string; name: string }

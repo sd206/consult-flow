@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { goTo } from './nav'
 import { test, expect, type Page } from '@playwright/test'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 import { todayIso } from '../../src/lib/domain/dates'
@@ -190,7 +191,7 @@ test('unpaid invoices page shows ageing and filters by client', async ({ page })
   const { error } = await adminDb().from('invoices').update({ issue_date: due, due_date: due }).eq('id', old.invoiceId)
   expect(error).toBeNull()
   await login(page, f.manager.email)
-  await page.getByRole('link', { name: 'Unpaid', exact: true }).click()
+  await goTo(page, 'Billing', 'Unpaid invoices')
   await expect(page.getByRole('heading', { name: 'Unpaid invoices' })).toBeVisible()
   await expect(page.getByText('Overdue by 45 days')).toBeVisible()
   await expect(page.getByTestId('ageing-d31_60')).toContainText('$1,111.11')

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { goTo } from './nav'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 import { seedApprovedHours } from '../integration/invoice-fixtures'
 
@@ -39,7 +40,7 @@ async function findHours(page: Page) {
 async function buildDraft(page: Page, f: Firm) {
   await login(page, f.manager.email)
   await page.goto(`/f/${f.firmId}`)
-  await page.getByRole('link', { name: 'Invoices', exact: true }).click()
+  await goTo(page, 'Billing', 'Invoices')
   await page.getByRole('link', { name: 'New invoice' }).click()
   await findHours(page)
   await expect(page.getByRole('cell', { name: '15.50' })).toBeVisible()
@@ -91,7 +92,7 @@ test('manager builds, edits and issues an invoice', async ({ page }) => {
   expect(res.status()).toBe(200)
   expect(res.headers()['content-type']).toContain('application/pdf')
 
-  await page.getByRole('link', { name: 'Invoices', exact: true }).first().click()
+  await goTo(page, 'Billing', 'Invoices')
   await expect(page.getByRole('link', { name: `ACME-${year}-0001` })).toBeVisible()
   await expect(page.getByRole('cell', { name: '$2,084.96' })).toBeVisible()
 })
