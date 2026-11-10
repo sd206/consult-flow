@@ -15,7 +15,7 @@ import type { InvoiceDetail } from '@/modules/invoices/data'
 import { issueConfirmText } from '@/modules/invoices/issue-confirm'
 import { DiscountForm } from './discount-form'
 import { LinesTable } from './lines-table'
-import { useRun } from './use-run'
+import { useRun } from '@/components/use-run'
 
 export type ConsultantOption = { id: string; name: string; checked: boolean }
 export type TemplateOption = { id: string; name: string }

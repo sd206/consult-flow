@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { setDiscountAction } from '@/modules/invoices/actions'
 import type { InvoiceDetail } from '@/modules/invoices/data'
-import { useRun } from './use-run'
+import { useRun } from '@/components/use-run'
 
 export function DiscountForm({ firmId, invoice }: { firmId: string; invoice: InvoiceDetail }) {
   const { pending, run, errors, error } = useRun()

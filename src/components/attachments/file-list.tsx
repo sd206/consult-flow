@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import type { FormResult } from '@/lib/form'
-import { useRun } from '@/app/f/[firmId]/invoices/[id]/use-run'
+import { useRun } from '@/components/use-run'
 
 export type FileItem = { id: string; fileName: string }
 

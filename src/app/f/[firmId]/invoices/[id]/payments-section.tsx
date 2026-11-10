@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { FileList } from '@/components/attachments/file-list'
-import { takeFiles, uploadFiles } from '@/components/attachments/upload-files'
+import { FILE_ACCEPT, takeFiles, uploadFiles } from '@/components/attachments/upload-files'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,7 +19,7 @@ import {
 } from '@/modules/payments/actions'
 import type { PaymentRow } from '@/modules/payments/data'
 import { INVOICE_STATUS_LABEL } from '../status-label'
-import { useRun } from './use-run'
+import { useRun } from '@/components/use-run'
 
 const METHOD_LABEL: Record<string, string> = {
   bank_transfer: 'Bank transfer',
@@ -28,7 +28,6 @@ const METHOD_LABEL: Record<string, string> = {
   cash: 'Cash',
   other: 'Other',
 }
-const ACCEPT = '.pdf,.png,.jpg,.jpeg,.heic,application/pdf,image/png,image/jpeg,image/heic'
 const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'
 const select = 'h-8 rounded-lg border bg-background px-2 text-sm'
@@ -73,7 +72,7 @@ function FilesInput({ id, label, error }: { id: string; label: string; error?: s
   return (
     <div className="flex flex-col gap-1">
       <Label htmlFor={id}>{label}</Label>
-      <input id={id} name="files" type="file" multiple accept={ACCEPT} className="text-sm" aria-invalid={!!error} />
+      <input id={id} name="files" type="file" multiple accept={FILE_ACCEPT} className="text-sm" aria-invalid={!!error} />
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
@@ -164,7 +163,7 @@ function ExistingFiles({ firmId, invoiceId, payment }: { firmId: string; invoice
   return (
     <FileList
       files={payment.attachments}
-      onRemove={(attachmentId) => deleteAttachmentAction(firmId, invoiceId, attachmentId)}
+      onRemove={(attachmentId) => deleteAttachmentAction(firmId, invoiceId, payment.id, attachmentId)}
     />
   )
 }

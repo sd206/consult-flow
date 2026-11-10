@@ -123,6 +123,97 @@ describe('storage hardening', () => {
     expect(signed.error).not.toBeNull()
   })
 
+  it('holding names and owner folders must be uuids', async () => {
+    const pid = await newPayment(f)
+    const eid = await newExpense(f)
+    const base = `firms/${f.firmId}/attachments`
+    const storage = f.manager.db.storage.from(BUCKET)
+
+    for (const bad of [
+      `${base}/payments/${pid}/incoming-foo`,
+      `${base}/expenses/${eid}/incoming-${crypto.randomUUID()}.pdf`,
+      `${base}/expenses/${eid}/incoming-${crypto.randomUUID().toUpperCase()}`,
+      `${base}/payments/not-a-uuid/incoming-${crypto.randomUUID()}`,
+      `${base}/expenses/${eid}x/incoming-${crypto.randomUUID()}`,
+    ]) {
+      expect((await storage.upload(bad, pdfBlob())).error, bad).not.toBeNull()
+      expect(await exists(bad), bad).toBe(false)
+    }
+
+    const good = `${base}/expenses/${eid}/incoming-${crypto.randomUUID()}`
+    expect((await storage.upload(good, pdfBlob())).error).toBeNull()
+    expect(await exists(good)).toBe(true)
+  })
+
+  it('other firm folders: managers may insert, consultants may not', async () => {
+    const misc = `firms/${f.firmId}/misc/${crypto.randomUUID()}.txt`
+    const txt = () => new Blob(['hello'], { type: 'text/plain' })
+    expect((await f.manager.db.storage.from(BUCKET).upload(misc, txt())).error).toBeNull()
+    expect(await exists(misc)).toBe(true)
+
+    const misc2 = `firms/${f.firmId}/misc/${crypto.randomUUID()}.txt`
+    expect((await f.consultant.db.storage.from(BUCKET).upload(misc2, txt())).error).not.toBeNull()
+    expect(await exists(misc2)).toBe(false)
+    await adminDb().storage.from(BUCKET).remove([misc])
+  })
+
+  it.each(['payment', 'expense'] as const)(
+    '%s: a holding object cannot be registered directly; the normal flow still works',
+    async (kind) => {
+      const id = kind === 'payment' ? await newPayment(f) : await newExpense(f)
+      const owner: Owner = { kind, id }
+      const path = await putIncoming(f, owner)
+      const common = { p_storage_path: path, p_file_name: 'r.pdf', p_mime: 'application/pdf', p_size: 25 }
+      const { data, error } =
+        kind === 'payment'
+          ? await f.manager.db.rpc('add_payment_attachment', { p_payment: id, ...common })
+          : await f.manager.db.rpc('add_expense_attachment', { p_expense: id, ...common })
+      expect(data).toBeNull()
+      expect(error?.message).toContain('attachments_path_chk')
+      const col = kind === 'payment' ? 'payment_id' : 'expense_id'
+      const rows = await adminDb().from('attachments').select('id').eq(col, id)
+      expect(rows.data).toEqual([])
+
+      expect(await attach(f, owner)).toEqual({ added: 1, rejected: [] })
+      const after = await adminDb().from('attachments').select('storage_path').eq(col, id)
+      expect(after.data).toHaveLength(1)
+      expect((after.data as { storage_path: string }[])[0].storage_path).toMatch(/\/[0-9a-f-]{36}\.pdf$/)
+    },
+  )
+
+  it('ownerFolder refuses ids that are not uuids', () => {
+    const id = crypto.randomUUID()
+    expect(() => ownerFolder('not-a-firm', { kind: 'expense', id })).toThrow()
+    expect(() => ownerFolder(f.firmId, { kind: 'payment', id: '../x' })).toThrow()
+    expect(() => ownerFolder(f.firmId, { kind: 'expense', id: '' })).toThrow()
+    expect(ownerFolder(f.firmId, { kind: 'expense', id })).toBe(`firms/${f.firmId}/attachments/expenses/${id}/`)
+  })
+
+  it("deleteAttachment refuses another owner's file and leaves it in place", async () => {
+    const pid = await newPayment(f)
+    const eid = await newExpense(f)
+    const owner: Owner = { kind: 'payment', id: pid }
+    await attach(f, owner)
+    const { data } = await adminDb().from('attachments').select('id, storage_path').eq('payment_id', pid)
+    const att = (data as { id: string; storage_path: string }[])[0]
+
+    expect(await deleteAttachment(f.manager.db, f.firmId, { kind: 'expense', id: eid }, att.id)).toEqual({
+      ok: false,
+      error: 'File not found.',
+    })
+    const otherPayment = await newPayment(f)
+    expect(await deleteAttachment(f.manager.db, f.firmId, { kind: 'payment', id: otherPayment }, att.id)).toEqual({
+      ok: false,
+      error: 'File not found.',
+    })
+    expect(await exists(att.storage_path)).toBe(true)
+    const still = await adminDb().from('attachments').select('id').eq('id', att.id)
+    expect(still.data).toHaveLength(1)
+
+    must(await deleteAttachment(f.manager.db, f.firmId, owner, att.id))
+    expect(await exists(att.storage_path)).toBe(false)
+  })
+
   it('stored attachment files cannot be overwritten, moved or removed by a manager', async () => {
     const pid = await newPayment(f)
     expect(await attach(f, { kind: 'payment', id: pid })).toEqual({ added: 1, rejected: [] })
@@ -177,7 +268,7 @@ describe('storage hardening', () => {
     expect(await names(folder)).toHaveLength(2)
 
     const { data: atts } = await adminDb().from('attachments').select('id').eq('payment_id', pid)
-    must(await deleteAttachment(f.manager.db, f.firmId, (atts as { id: string }[])[0].id))
+    must(await deleteAttachment(f.manager.db, f.firmId, owner, (atts as { id: string }[])[0].id))
     expect(await names(folder)).toHaveLength(1)
 
     // A stray holding object goes with the payment too.

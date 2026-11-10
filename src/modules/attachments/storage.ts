@@ -47,8 +47,13 @@ export type UploadTarget = { index: number; uploadPath: string; token: string }
 export type UploadedItem = { uploadPath: string; name: string }
 
 const KIND_FOLDER = { payment: 'payments', expense: 'expenses' } as const
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
+/** The owner's folder. Throws (fails closed) unless both ids are uuids, so a path can never escape it. */
 export function ownerFolder(firmId: string, owner: Owner): string {
+  if (!UUID_RE.test(firmId) || !UUID_RE.test(owner.id) || !(owner.kind in KIND_FOLDER)) {
+    throw new Error('attachment owner folder: invalid id')
+  }
   return `firms/${firmId}/attachments/${KIND_FOLDER[owner.kind]}/${owner.id}/`
 }
 
@@ -249,12 +254,22 @@ export async function finalizeUploads(
   return ok({ added, rejected })
 }
 
-/** Deletes the attachment row (role and lock rules in the RPC, as the user), then its file. */
-export async function deleteAttachment(db: SupabaseClient, firmId: string, attachmentId: string): Promise<Result<void>> {
+/**
+ * Deletes the owner's attachment row (role and lock rules in the RPC, as the user), then its file.
+ * An attachment of any other owner is 'File not found.' and left alone.
+ */
+export async function deleteAttachment(
+  db: SupabaseClient,
+  firmId: string,
+  owner: Owner,
+  attachmentId: string,
+): Promise<Result<void>> {
+  if (!UUID_RE.test(owner.id)) return fail(NOT_FOUND)
   const { data: row, error: lookupError } = await db
     .from('attachments')
     .select('id')
     .eq('firm_id', firmId)
+    .eq(owner.kind === 'expense' ? 'expense_id' : 'payment_id', owner.id)
     .eq('id', attachmentId)
     .maybeSingle()
   if (lookupError) return fail(mapDbError(lookupError))

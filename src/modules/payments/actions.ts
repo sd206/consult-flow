@@ -96,10 +96,11 @@ export async function deletePaymentAction(firmId: string, invoiceId: string, pay
 export async function deleteAttachmentAction(
   firmId: string,
   invoiceId: string,
+  paymentId: string,
   attachmentId: string,
 ): Promise<FormResult> {
   const { db } = await requireFirmRole(firmId, [...MANAGERS])
-  const result = await deleteAttachment(db, firmId, attachmentId)
+  const result = await deleteAttachment(db, firmId, paymentId, attachmentId)
   if (result.ok) revalidate(firmId, invoiceId)
   return result
 }

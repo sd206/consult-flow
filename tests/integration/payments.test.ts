@@ -258,7 +258,7 @@ describe('payments data', () => {
     const { invoiceId, paymentId } = await setup(f)
     await attach(f, paymentId, [pdf()])
     const att = must(await listPayments(f.manager.db, f.firmId, invoiceId))[0].attachments[0]
-    must(await deleteAttachment(f.manager.db, f.firmId, att.id))
+    must(await deleteAttachment(f.manager.db, f.firmId, paymentId, att.id))
     expect(await folder(f, paymentId)).toEqual([])
     expect(must(await listPayments(f.manager.db, f.firmId, invoiceId))[0].attachments).toEqual([])
   })

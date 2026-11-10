@@ -19,7 +19,7 @@ import {
   finalizeExpenseUploadsAction,
   updateExpenseAction,
 } from '@/modules/expenses/actions'
-import { useRun } from '../invoices/[id]/use-run'
+import { useRun } from '@/components/use-run'
 
 export type CategoryOption = { id: string; name: string; active: boolean }
 export type ClientOption = { id: string; name: string }

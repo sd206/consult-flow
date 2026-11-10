@@ -103,7 +103,7 @@ export async function deleteExpenseAttachmentAction(
   attachmentId: string,
 ): Promise<FormResult> {
   const { db } = await requireFirmRole(firmId, [...MANAGERS])
-  const result = await deleteAttachment(db, firmId, attachmentId)
+  const result = await deleteAttachment(db, firmId, { kind: 'expense', id: expenseId }, attachmentId)
   if (result.ok) revalidate(firmId, expenseId)
   return result
 }

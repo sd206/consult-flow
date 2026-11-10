@@ -11,7 +11,7 @@ import {
   setCategoryActiveAction,
 } from '@/modules/expense-categories/actions'
 import type { CategoryRow as Category } from '@/modules/expense-categories/data'
-import { useRun } from '../../invoices/[id]/use-run'
+import { useRun } from '@/components/use-run'
 
 const td = 'py-2 pr-4 align-top'
 

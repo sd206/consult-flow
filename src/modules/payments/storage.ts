@@ -32,5 +32,13 @@ export function finalizeUploads(
   return attachments.finalizeUploads(db, firmId, payment(paymentId), items, validate)
 }
 
-export const deleteAttachment = attachments.deleteAttachment
+/** Deletes one of the payment's attachments; another owner's file is 'File not found.'. */
+export function deleteAttachment(
+  db: SupabaseClient,
+  firmId: string,
+  paymentId: string,
+  attachmentId: string,
+): Promise<Result<void>> {
+  return attachments.deleteAttachment(db, firmId, payment(paymentId), attachmentId)
+}
 export const attachmentDownloadUrl = attachments.attachmentDownloadUrl

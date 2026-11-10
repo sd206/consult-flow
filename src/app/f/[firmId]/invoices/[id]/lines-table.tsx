@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label'
 import { formatMoney } from '@/lib/domain/money'
 import { deleteManualLineAction, saveManualLineAction, setLineDescriptionAction } from '@/modules/invoices/actions'
 import type { InvoiceLine } from '@/modules/invoices/data'
-import { useRun } from './use-run'
+import { useRun } from '@/components/use-run'
 
 const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'

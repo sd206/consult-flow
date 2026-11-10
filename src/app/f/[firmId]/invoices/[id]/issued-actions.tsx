@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { regeneratePdfAction, voidInvoiceAction } from '@/modules/invoices/actions'
-import { useRun } from './use-run'
+import { useRun } from '@/components/use-run'
 
 export function IssuedActions({
   firmId,
