@@ -144,6 +144,12 @@ Snapshots: on issue, the client billing details and firm header are copied onto 
 ### 5.4 Expenses
 Manager enters an expense with optional client/project and attaches receipts. Expenses list filters by date, category, client, project.
 
+1. One amount per expense: the total paid, tax included.
+2. Receipts are optional; the list marks expenses with no receipt and can filter to them.
+3. Admins and Managers manage categories (add, rename, retire, restore; delete only when unused). Names are unique per firm ignoring case and surrounding spaces. A retired category stays on existing expenses but can't be chosen for new or changed ones.
+4. When a project is set, the expense's client is always the project's client.
+5. Receipts and payment proofs share one attachments store. Users can only drop new uploads into a holding area; moving, overwriting and deleting stored files happens on the server after its checks. Abandoned uploads older than a day are cleaned up.
+
 ### 5.5 P&L reporting
 Filters: date range, client(s), project(s). Group by: month, quarter, client, or project.
 
