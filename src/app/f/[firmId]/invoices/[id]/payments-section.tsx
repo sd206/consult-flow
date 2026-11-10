@@ -60,9 +60,18 @@ function FilesInput({ id, label, error }: { id: string; label: string; error?: s
   )
 }
 
-function RecordForm({ firmId, invoiceId, balanceDue }: { firmId: string; invoiceId: string; balanceDue: string }) {
+function RecordForm({
+  firmId,
+  invoiceId,
+  balanceDue,
+  onWarning,
+}: {
+  firmId: string
+  invoiceId: string
+  balanceDue: string
+  onWarning: (w: string | null) => void
+}) {
   const { pending, run, errors, error } = useRun()
-  const [warning, setWarning] = useState<string | null>(null)
   const [resets, setResets] = useState(0)
   return (
     <form
@@ -72,11 +81,11 @@ function RecordForm({ firmId, invoiceId, balanceDue }: { firmId: string; invoice
       onSubmit={(e) => {
         e.preventDefault()
         const fd = new FormData(e.currentTarget)
-        setWarning(null)
+        onWarning(null)
         run(
           async () => {
             const r = await recordPaymentAction(firmId, invoiceId, fd)
-            if (r.ok) setWarning(r.data.fileWarning)
+            if (r.ok) onWarning(r.data.fileWarning)
             return r
           },
           () => setResets((n) => n + 1),
@@ -123,11 +132,6 @@ function RecordForm({ firmId, invoiceId, balanceDue }: { firmId: string; invoice
       {error && (
         <p role="alert" className="w-full text-sm text-destructive">
           {error}
-        </p>
-      )}
-      {warning && (
-        <p role="status" className="w-full text-sm">
-          {warning}
         </p>
       )}
     </form>
@@ -310,6 +314,7 @@ function PaymentRowView({
 export function PaymentsSection({ firmId, invoiceId, status, currency, amountPaid, balanceDue, payments }: Props) {
   const editable = status !== 'void'
   const canRecord = status === 'issued' || status === 'partly_paid'
+  const [warning, setWarning] = useState<string | null>(null)
   const m = (v: string) => formatMoney(v, currency)
   return (
     <section id="payments" className="mt-10">
@@ -359,7 +364,12 @@ export function PaymentsSection({ firmId, invoiceId, status, currency, amountPai
         <p className="mt-4 text-sm text-muted-foreground">No payments recorded.</p>
       )}
 
-      {canRecord && <RecordForm firmId={firmId} invoiceId={invoiceId} balanceDue={balanceDue} />}
+      {canRecord && <RecordForm firmId={firmId} invoiceId={invoiceId} balanceDue={balanceDue} onWarning={setWarning} />}
+      {warning && (
+        <p role="status" className="mt-3 text-sm">
+          {warning}
+        </p>
+      )}
     </section>
   )
 }

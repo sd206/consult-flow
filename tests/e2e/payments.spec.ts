@@ -75,6 +75,18 @@ test('a disguised file is rejected with a warning but the payment is recorded', 
   await expect(page.getByTestId('status')).toHaveText('Partly paid')
   await expect(page.getByRole('status').filter({ hasText: 'fake.pdf' })).toBeVisible()
   await expect(page.getByRole('row', { name: /TRX-FAKE/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'fake.pdf' })).toHaveCount(0)
+})
+
+test('the file warning survives a payment that completes the invoice', async ({ page }) => {
+  const { f, invoiceId } = await setup('Pay Full Fake Firm', '666.66')
+  await open(page, f, invoiceId)
+  await record(page, '666.66', { reference: 'TRX-FULL', file: FAKE })
+  await expect(page.getByTestId('status')).toHaveText('Paid')
+  await expect(form(page)).toHaveCount(0)
+  await expect(page.getByRole('status').filter({ hasText: 'fake.pdf' })).toBeVisible()
+  await expect(page.getByRole('row', { name: /TRX-FULL/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: 'fake.pdf' })).toHaveCount(0)
 })
 
 test('edit and delete a payment', async ({ page }) => {
@@ -113,13 +125,13 @@ test('remove an attached file while editing', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'remittance.pdf' })).toHaveCount(0)
 })
 
-test('consultant cannot download an attachment', async ({ page, browser }) => {
+test('consultant cannot download an attachment', async ({ page, browser, baseURL }) => {
   const { f, invoiceId } = await setup('Pay Block Firm', '444.44')
   await open(page, f, invoiceId)
   await record(page, '44.00', { reference: 'TRX-BLK', file: REMITTANCE })
   await expect(page.getByRole('link', { name: 'remittance.pdf' })).toBeVisible()
   const { data } = await adminDb().from('attachments').select('id').eq('firm_id', f.firmId).single()
-  const ctx = await browser.newContext({ baseURL: 'http://localhost:3000' })
+  const ctx = await browser.newContext({ baseURL })
   const cPage = await ctx.newPage()
   await login(cPage, f.consultant.email)
   const res = await cPage.request.get(`/f/${f.firmId}/attachments/${data!.id}`)
