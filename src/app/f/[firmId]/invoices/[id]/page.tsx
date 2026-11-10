@@ -4,9 +4,11 @@ import { requireFirmRole } from '@/lib/auth/context'
 import { formatMoney } from '@/lib/domain/money'
 import { listTemplates } from '@/modules/invoice-templates/data'
 import { getInvoice, listCandidates } from '@/modules/invoices/data'
+import { listPayments } from '@/modules/payments/data'
 import { INVOICE_STATUS_LABEL } from '../status-label'
 import { DraftEditor, type ConsultantOption } from './draft-editor'
 import { IssuedActions } from './issued-actions'
+import { PaymentsSection } from './payments-section'
 
 const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'
@@ -59,6 +61,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ firmId
     )
   }
 
+  const paymentsRes = await listPayments(db, firmId, id)
   const m = (v: string) => formatMoney(v, inv.currency)
   const cell = 'flex flex-col gap-0.5 text-sm'
   return (
@@ -150,6 +153,16 @@ export default async function InvoicePage({ params }: { params: Promise<{ firmId
           <dd data-testid="total">{m(inv.total)}</dd>
         </div>
       </dl>
+
+      <PaymentsSection
+        firmId={firmId}
+        invoiceId={inv.id}
+        status={inv.status}
+        currency={inv.currency}
+        amountPaid={inv.amountPaid}
+        balanceDue={inv.balanceDue}
+        payments={paymentsRes.ok ? paymentsRes.data : []}
+      />
 
       <IssuedActions firmId={firmId} invoiceId={inv.id} status={inv.status} hasPdf={!!inv.pdfPath} />
     </div>
