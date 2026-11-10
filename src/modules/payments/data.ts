@@ -118,3 +118,73 @@ export async function deletePayment(db: SupabaseClient, firmId: string, paymentI
   }
   return ok(undefined)
 }
+
+export const PAYMENT_PAGE_SIZE = 50
+
+export type PaymentFilters = { from: string | null; to: string | null; clientId: string | null }
+
+export type FirmPaymentRow = {
+  paymentId: string
+  paidOn: string
+  invoiceId: string
+  invoiceNumber: string
+  invoiceStatus: string
+  clientId: string
+  clientName: string
+  method: PaymentMethod
+  reference: string | null
+  amount: string
+  fileCount: number
+}
+
+type FirmPaymentDb = {
+  payment_id: string
+  paid_on: string
+  invoice_id: string
+  invoice_number: string
+  invoice_status: string
+  client_id: string
+  client_name: string
+  method: PaymentMethod
+  reference: string | null
+  amount: string
+  file_count: number
+}
+
+/** One page of every payment in the firm, plus the total and count for the same filters. */
+export async function listAllPayments(
+  db: SupabaseClient,
+  firmId: string,
+  filters: PaymentFilters,
+  page = 1,
+): Promise<Result<{ rows: FirmPaymentRow[]; total: string; count: number; pages: number }>> {
+  const pageNo = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1
+  const args = { p_firm: firmId, p_from: filters.from, p_to: filters.to, p_client: filters.clientId }
+  const [totals, list] = await Promise.all([
+    db.rpc('payment_totals', args),
+    db.rpc('list_payments', { ...args, p_limit: PAYMENT_PAGE_SIZE, p_offset: (pageNo - 1) * PAYMENT_PAGE_SIZE }),
+  ])
+  if (totals.error) return fail(mapDbError(totals.error))
+  if (list.error) return fail(mapDbError(list.error))
+  const t = (totals.data as { total: string; payment_count: number }[] | null)?.[0]
+  if (!t) return fail(mapDbError(null))
+  const rows = ((list.data ?? []) as FirmPaymentDb[]).map((r) => ({
+    paymentId: r.payment_id,
+    paidOn: r.paid_on,
+    invoiceId: r.invoice_id,
+    invoiceNumber: r.invoice_number,
+    invoiceStatus: r.invoice_status,
+    clientId: r.client_id,
+    clientName: r.client_name,
+    method: r.method,
+    reference: r.reference,
+    amount: r.amount,
+    fileCount: r.file_count,
+  }))
+  return ok({
+    rows,
+    total: t.total,
+    count: t.payment_count,
+    pages: Math.max(1, Math.ceil(t.payment_count / PAYMENT_PAGE_SIZE)),
+  })
+}

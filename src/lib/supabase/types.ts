@@ -683,6 +683,11 @@ isOneToOne: false
               "amount": string,"category_id": string,"category_name": string,"client_id": string,"client_name": string,"id": string,"payee": string,"project_id": string,"project_name": string,"receipt_count": number,"spent_on": string
             }[]
                            },
+"list_payments":
+{ Args: { "p_client": string,"p_firm": string,"p_from": string,"p_limit": number,"p_offset": number,"p_to": string }; Returns: {
+              "amount": string,"client_id": string,"client_name": string,"file_count": number,"invoice_id": string,"invoice_number": string,"invoice_status": string,"method": string,"paid_on": string,"payment_id": string,"reference": string
+            }[]
+                           },
 "my_assignments":
 { Args: { "p_firm": string }; Returns: {
               "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string
@@ -713,6 +718,11 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"payment_totals":
+{ Args: { "p_client": string,"p_firm": string,"p_from": string,"p_to": string }; Returns: {
+              "payment_count": number,"total": string
+            }[]
+                           },
 "platform_list_firms":
 { Args: Record<PropertyKey, never>; Returns: {
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
