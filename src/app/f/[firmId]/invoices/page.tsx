@@ -1,45 +1,59 @@
-import Link from 'next/link'
-import { requireFirmRole } from '@/lib/auth/context'
-import type { InvoiceStatus } from '@/lib/db-types'
-import { formatMoney } from '@/lib/domain/money'
-import { listInvoices } from '@/modules/invoices/data'
-import { INVOICE_STATUS_LABEL, INVOICE_STATUSES } from './status-label'
+import Link from "next/link";
+import { requireFirmRole } from "@/lib/auth/context";
+import type { InvoiceStatus } from "@/lib/db-types";
+import { formatMoney } from "@/lib/domain/money";
+import { listInvoices } from "@/modules/invoices/data";
+import { INVOICE_STATUS_LABEL, INVOICE_STATUSES } from "./status-label";
 
-const th = 'py-2 pr-4 font-medium'
-const td = 'py-2 pr-4'
-const filterLink = 'underline-offset-4 hover:underline aria-[current=page]:font-semibold'
+const th = "py-2 pr-4 font-medium";
+const td = "py-2 pr-4";
+const filterLink =
+  "underline-offset-4 hover:underline aria-[current=page]:font-semibold";
 
 export default async function InvoicesPage({
   params,
   searchParams,
 }: {
-  params: Promise<{ firmId: string }>
-  searchParams: Promise<{ status?: string | string[] }>
+  params: Promise<{ firmId: string }>;
+  searchParams: Promise<{ status?: string | string[] }>;
 }) {
-  const { firmId } = await params
-  const sp = await searchParams
-  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
-  const raw = typeof sp.status === 'string' ? sp.status : undefined
-  const status = INVOICE_STATUSES.find((s) => s === raw) as InvoiceStatus | undefined
-  const list = await listInvoices(db, firmId, { status })
-  const base = `/f/${firmId}/invoices`
+  const { firmId } = await params;
+  const sp = await searchParams;
+  const { db } = await requireFirmRole(firmId, ["admin", "manager"]);
+  const raw = typeof sp.status === "string" ? sp.status : undefined;
+  const status = INVOICE_STATUSES.find((s) => s === raw) as
+    InvoiceStatus | undefined;
+  const list = await listInvoices(db, firmId, { status });
+  const base = `/f/${firmId}/invoices`;
 
   return (
     <div className="max-w-5xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Invoices</h1>
-        <Link
-          href={`${base}/new`}
-          className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground"
-        >
-          New invoice
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link
+            href={`${base}/unpaid`}
+            className="text-sm underline underline-offset-4"
+          >
+            Unpaid invoices
+          </Link>
+          <Link
+            href={`${base}/new`}
+            className="inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground"
+          >
+            New invoice
+          </Link>
+        </div>
       </div>
 
       <nav aria-label="Invoice status" className="mt-4">
         <ul className="flex flex-wrap gap-4 text-sm">
           <li>
-            <Link href={base} aria-current={status ? undefined : 'page'} className={filterLink}>
+            <Link
+              href={base}
+              aria-current={status ? undefined : "page"}
+              className={filterLink}
+            >
               All
             </Link>
           </li>
@@ -47,7 +61,7 @@ export default async function InvoicesPage({
             <li key={s}>
               <Link
                 href={`${base}?status=${s}`}
-                aria-current={status === s ? 'page' : undefined}
+                aria-current={status === s ? "page" : undefined}
                 className={filterLink}
               >
                 {INVOICE_STATUS_LABEL[s]}
@@ -67,7 +81,15 @@ export default async function InvoicesPage({
         <table className="mt-4 w-full text-left text-sm">
           <thead>
             <tr className="border-b">
-              {['Number', 'Client', 'Period', 'Issue date', 'Due date', 'Total', 'Status'].map((h) => (
+              {[
+                "Number",
+                "Client",
+                "Period",
+                "Issue date",
+                "Due date",
+                "Total",
+                "Status",
+              ].map((h) => (
                 <th key={h} scope="col" className={th}>
                   {h}
                 </th>
@@ -78,8 +100,11 @@ export default async function InvoicesPage({
             {list.data.map((r) => (
               <tr key={r.id} className="border-b">
                 <td className={td}>
-                  <Link href={`${base}/${r.id}`} className="underline underline-offset-4">
-                    {r.number ?? 'Draft'}
+                  <Link
+                    href={`${base}/${r.id}`}
+                    className="underline underline-offset-4"
+                  >
+                    {r.number ?? "Draft"}
                   </Link>
                 </td>
                 <td className={td}>{r.clientName}</td>
@@ -96,5 +121,5 @@ export default async function InvoicesPage({
         </table>
       )}
     </div>
-  )
+  );
 }

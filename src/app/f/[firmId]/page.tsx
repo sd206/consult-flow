@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { requireFirmRole } from '@/lib/auth/context'
+import { formatMoney } from '@/lib/domain/money'
+import { getFirm } from '@/modules/firms/data'
 import { getDashboardSummary } from '@/modules/firms/dashboard'
 
 export default async function FirmDashboard({ params }: { params: Promise<{ firmId: string }> }) {
@@ -24,7 +26,8 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
     )
   }
 
-  const summary = await getDashboardSummary(db, firmId)
+  const [summary, firm] = await Promise.all([getDashboardSummary(db, firmId), getFirm(db, firmId)])
+  const currency = firm.ok ? firm.data.currency : 'USD'
   const isAdmin = role === 'admin'
 
   return (
@@ -58,6 +61,23 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
               </dt>
               <dd className="text-2xl font-semibold" data-testid="awaiting-approval-count">
                 {summary.data.awaitingApproval}
+              </dd>
+            </div>
+          </dl>
+          <dl className="mt-4 grid grid-cols-2 gap-4 text-sm">
+            <div className="rounded border p-3" data-testid="outstanding">
+              <dt className="text-muted-foreground">
+                <Link href={`/f/${firmId}/invoices/unpaid`} className="underline underline-offset-4">
+                  Outstanding
+                </Link>
+              </dt>
+              <dd className="text-2xl font-semibold">{formatMoney(summary.data.outstanding, currency)}</dd>
+            </div>
+            <div className="rounded border p-3" data-testid="overdue">
+              <dt className="text-muted-foreground">Overdue</dt>
+              <dd className="text-2xl font-semibold">{formatMoney(summary.data.overdue, currency)}</dd>
+              <dd className="text-muted-foreground">
+                {summary.data.overdueCount} {summary.data.overdueCount === 1 ? 'invoice' : 'invoices'}
               </dd>
             </div>
           </dl>

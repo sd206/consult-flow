@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getDashboardSummary } from '@/modules/firms/dashboard'
+import { todayIso } from '@/lib/domain/dates'
+import { addDays } from '@/lib/domain/weeks'
 import { adminDb, newFirm } from './helpers'
+import { issueManualInvoice } from './invoice-fixtures'
 import { PAST_WEEK, seedTimesheetFixture } from './timesheet-fixtures'
 
 describe('getDashboardSummary', () => {
@@ -10,7 +13,7 @@ describe('getDashboardSummary', () => {
     const first = await getDashboardSummary(f.manager.db, f.firmId)
     expect(first).toEqual({
       ok: true,
-      data: { consultants: 0, clients: 0, projects: 0, assignments: 0, hasLogo: false, awaitingApproval: 0 },
+      data: { consultants: 0, clients: 0, projects: 0, assignments: 0, hasLogo: false, awaitingApproval: 0, outstanding: '0.00', overdue: '0.00', overdueCount: 0 },
     })
 
     const { data: c1 } = await a.from('clients').insert({ firm_id: f.firmId, name: 'Active Co' }).select('id').single()
@@ -41,7 +44,7 @@ describe('getDashboardSummary', () => {
     const res = await getDashboardSummary(f.manager.db, f.firmId)
     expect(res).toEqual({
       ok: true,
-      data: { consultants: 1, clients: 1, projects: 1, assignments: 1, hasLogo: true, awaitingApproval: 0 },
+      data: { consultants: 1, clients: 1, projects: 1, assignments: 1, hasLogo: true, awaitingApproval: 0, outstanding: '0.00', overdue: '0.00', overdueCount: 0 },
     })
   })
 
@@ -74,5 +77,16 @@ describe('getDashboardSummary', () => {
     expect(sub.error).toBeNull()
     const after = await getDashboardSummary(f.manager.db, f.firmId)
     expect(after).toMatchObject({ ok: true, data: { awaitingApproval: 1 } })
+  })
+
+  it('includes outstanding and overdue totals as strings', async () => {
+    const f = await newFirm()
+    const a = await issueManualInvoice(f, '300.00')
+    const b = await issueManualInvoice(f, '200.50')
+    const due = addDays(todayIso(), -10)
+    await adminDb().from('invoices').update({ issue_date: due, due_date: due }).eq('id', a.invoiceId)
+    const res = await getDashboardSummary(f.manager.db, f.firmId)
+    expect(res).toMatchObject({ ok: true, data: { outstanding: '500.50', overdue: '300.00', overdueCount: 1 } })
+    void b
   })
 })

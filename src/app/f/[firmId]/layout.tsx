@@ -13,6 +13,7 @@ const NAV: NavItem[] = [
   { label: 'My timesheet', path: '/timesheet', roles: ALL },
   { label: 'Timesheets', path: '/timesheets', roles: MANAGERS },
   { label: 'Invoices', path: '/invoices', roles: MANAGERS },
+  { label: 'Unpaid', path: '/invoices/unpaid', roles: MANAGERS },
   { label: 'Clients', path: '/clients', roles: MANAGERS },
   { label: 'Projects', path: '/projects', roles: MANAGERS },
   { label: 'Consultants', path: '/consultants', roles: MANAGERS },

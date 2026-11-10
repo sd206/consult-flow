@@ -1,6 +1,8 @@
 import path from 'node:path'
 import { test, expect, type Page } from '@playwright/test'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
+import { todayIso } from '../../src/lib/domain/dates'
+import { addDays } from '../../src/lib/domain/weeks'
 import { issueManualInvoice } from '../integration/invoice-fixtures'
 
 const REMITTANCE = path.join(__dirname, 'fixtures', 'remittance.pdf')
@@ -137,4 +139,37 @@ test('consultant cannot download an attachment', async ({ page, browser, baseURL
   const res = await cPage.request.get(`/f/${f.firmId}/attachments/${data!.id}`)
   expect(res.status()).toBe(404)
   await ctx.close()
+})
+
+test('unpaid invoices page shows ageing and filters by client', async ({ page }) => {
+  const f = await newFirm('Unpaid Firm')
+  const old = await issueManualInvoice(f, '1111.11')
+  const other = await issueManualInvoice(f, '222.22')
+  await issueManualInvoice(f, '333.33')
+  const due = addDays(todayIso(), -45)
+  const { error } = await adminDb().from('invoices').update({ issue_date: due, due_date: due }).eq('id', old.invoiceId)
+  expect(error).toBeNull()
+  await login(page, f.manager.email)
+  await page.getByRole('link', { name: 'Unpaid', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Unpaid invoices' })).toBeVisible()
+  await expect(page.getByText('Overdue by 45 days')).toBeVisible()
+  await expect(page.getByTestId('ageing-d31_60')).toContainText('$1,111.11')
+  await expect(page.getByTestId('ageing-d31_60')).toContainText('31–60 days')
+  await expect(page.getByRole('link', { name: 'Record payment' })).toHaveCount(3)
+
+  await page.getByLabel('Client').selectOption(other.clientId)
+  await page.getByRole('button', { name: 'Filter' }).click()
+  await expect(page).toHaveURL(new RegExp(`client=${other.clientId}`))
+  await expect(page.getByText('Overdue by 45 days')).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Record payment' })).toHaveCount(1)
+})
+
+test('manager dashboard shows outstanding total', async ({ page }) => {
+  const f = await newFirm('Dash Outstanding Firm')
+  await issueManualInvoice(f, '1000.01')
+  await issueManualInvoice(f, '2000.02')
+  await login(page, f.manager.email)
+  await page.goto(`/f/${f.firmId}`)
+  await expect(page.getByTestId('outstanding')).toContainText('$3,000.03')
+  await expect(page.getByTestId('overdue')).toContainText('$0.00')
 })
