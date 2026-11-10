@@ -163,6 +163,14 @@ Per group:
 
 Firm-level totals add an **Unallocated overhead** row for expenses with no client/project. Reports export to CSV.
 
+Decisions (Phase 6):
+1. Revenue also includes manual invoice lines on issued, non-void invoices (by issue date) and subtracts invoice discounts (by issue date). Draft and void invoices contribute nothing; approved hours count as revenue whether or not they are invoiced.
+2. Invoiced and Collected exclude tax: Invoiced = subtotal − discount of issued, non-void invoices by issue date; Collected = each payment × (total − tax) / total, rounded to cents, by `paid_on`.
+3. Month and quarter rows show direct expenses and overhead separately and subtract both in net profit. Client and project rows subtract only direct expenses; overhead appears once as the Unallocated row and is included in the totals' net.
+4. Manual lines, discounts and invoicing have no project, so in project grouping they (and expenses with a client but no project) fall in a "{client} — no project" row.
+5. When a client or project filter is applied, overhead is omitted (it can't be attributed).
+6. Margin % = net / revenue to one decimal; shown as "—" when revenue is zero. CSV text cells (labels, not amounts) that begin with =, +, -, @, tab or carriage return are prefixed with an apostrophe.
+
 ## 6. Errors and validation
 
 - All business rules are enforced on the server (Server Actions plus database constraints and RLS), not only in the UI.
