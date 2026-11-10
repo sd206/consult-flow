@@ -176,6 +176,32 @@ create trigger expenses_audit
   after insert or update or delete on public.expenses
   for each row execute function public.audit_row();
 
+-- A project moved to another client takes its expenses with it, so
+-- client_id always equals the project's client. The cascaded update leaves
+-- category_id and spent_on unchanged, so expenses_apply_rules lets it through
+-- (CATEGORY_RETIRED only fires when the category changes).
+create function public.projects_sync_expense_client()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.client_id is distinct from old.client_id then
+    update public.expenses e
+    set client_id = new.client_id
+    where e.firm_id = new.firm_id and e.project_id = new.id;
+  end if;
+  return null;
+end;
+$$;
+
+revoke execute on function public.projects_sync_expense_client() from public, anon, authenticated;
+
+create trigger projects_sync_expense_client
+  after update of client_id on public.projects
+  for each row execute function public.projects_sync_expense_client();
+
 alter table public.expenses enable row level security;
 
 revoke all on public.expenses from anon, authenticated;

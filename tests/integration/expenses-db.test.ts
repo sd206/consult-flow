@@ -149,6 +149,38 @@ describe('expenses (database)', () => {
       expect(after.client_id).toBe(clientB)
     })
 
+    it('moving a project to another client moves its expenses, even with a retired category', async () => {
+      const t = await newFirm('Project Move Firm')
+      const [tTravel, tOffice] = await Promise.all([categoryId(t.firmId, 'Travel'), categoryId(t.firmId, 'Office')])
+      const clientA = await insertClient(t.firmId)
+      const clientB = await insertClient(t.firmId)
+      const projectP = await insertProject(t.firmId, clientA)
+      const e1 = await insertExpenseOk(t, { category_id: tTravel, project_id: projectP, amount: '11.11' })
+      const e2 = await insertExpenseOk(t, { category_id: tOffice, project_id: projectP, amount: '22.22' })
+      const retire = await t.manager.db.from('expense_categories').update({ active: false }).eq('id', tTravel)
+      expect(retire.error).toBeNull()
+
+      const move = await t.manager.db.from('projects').update({ client_id: clientB }).eq('id', projectP)
+      expect(move.error).toBeNull()
+      expect((await expenseRow(e1.id)).client_id).toBe(clientB)
+      expect((await expenseRow(e2.id)).client_id).toBe(clientB)
+
+      const totals = (client: string) =>
+        t.manager.db
+          .rpc('expense_totals', {
+            p_firm: t.firmId,
+            p_from: null,
+            p_to: null,
+            p_category: null,
+            p_client: client,
+            p_project: null,
+            p_missing_receipt: null,
+          })
+          .single()
+      expect((await totals(clientB)).data).toEqual({ total: '33.33', expense_count: 2 })
+      expect((await totals(clientA)).data).toEqual({ total: '0.00', expense_count: 0 })
+    })
+
     it('a retired category blocks new use but not other edits; restoring re-enables it', async () => {
       const used = await insertExpenseOk(f, { category_id: travel })
       const other_ = await insertExpenseOk(f, { category_id: software })
