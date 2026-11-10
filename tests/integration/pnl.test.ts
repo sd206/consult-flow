@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { getPnl } from '@/modules/reports/pnl'
 import { newFirm } from './helpers'
 import { seedPnlScenario, type PnlIds } from './pnl-fixtures'
 
@@ -402,5 +403,26 @@ describe('pnl_report: reopened timesheets', () => {
       if (app.error) throw new Error(app.error.message)
     }
     expect(await march()).toBe('2300.00')
+  }, 60_000)
+})
+
+describe('getPnl', () => {
+  it('maps the March row and rejects consultants', async () => {
+    const f = await newFirm('PnL Data Firm')
+    await seedPnlScenario(f)
+    const params = { from: '2026-03-01', to: '2026-05-31', group: 'month' as const, clientIds: null, projectIds: null }
+    const res = await getPnl(f.manager.db, f.firmId, params)
+    if (!res.ok) throw new Error(res.error)
+    expect(res.data.find((r) => r.label === 'Mar 2026')).toMatchObject({
+      kind: 'group',
+      revenueHours: '2300.00',
+      labour: '1380.00',
+      net: '740.00',
+      margin: '32.2',
+    })
+    expect(res.data.at(-1)).toMatchObject({ kind: 'total', net: '785.00' })
+
+    const denied = await getPnl(f.consultant.db, f.firmId, params)
+    expect(denied).toEqual({ ok: false, error: "You don't have permission to do that." })
   }, 60_000)
 })
