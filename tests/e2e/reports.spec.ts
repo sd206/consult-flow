@@ -52,7 +52,7 @@ test('by client: client rows, unallocated overhead, invoiced and collected', asy
   await expect(page.getByRole('row', { name: /^Initech/ })).toBeVisible()
   await expect(page.getByRole('row', { name: /^Unallocated overhead/ })).toBeVisible()
   const globex = page.getByRole('row', { name: /^Globex/ })
-  await expect(globex.getByRole('cell').nth(7)).toHaveText("$1,620.00")
+  await expect(globex.getByRole('cell').nth(7)).toHaveText('$1,620.00')
   await expect(globex.getByRole('cell').nth(8)).toHaveText('$923.79')
 })
 
