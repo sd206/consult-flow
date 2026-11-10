@@ -82,6 +82,30 @@ npm run test:e2e    # Playwright; needs local Supabase running
 - **Receipts:** optional, but expenses without one are flagged "No receipt" in the list, and the list can be filtered to those. Files follow the same rules as payment files: PDF, PNG, JPEG or HEIC, up to 10 MB each and 5 per upload, checked by their content. Downloads use a short-lived storage link. Deleting an expense deletes its receipts too.
 - **Totals:** the list shows the number of expenses and their combined amount for the current filters (date range, category, client, project, no receipt only), not just the visible page.
 
+## Reports
+
+- **Who and where:** Admins and Managers open Reports → Profit & loss (`/f/{firmId}/reports/pnl`). Consultants cannot see reports.
+- **Choose a view:** pick a date range (from and to, both included, at most 3 years apart) and group by month, quarter, client or project. Optionally filter to some clients or projects.
+- **Columns:**
+  - **Revenue from hours:** approved hours times the client rate frozen on each entry, counted on the date the work was done. Hours on timesheets that are not approved yet are not counted.
+  - **Fees:** manual invoice lines (fees and rebilled costs) on issued, partly paid and paid invoices, counted on the invoice issue date. Voided and draft invoices are ignored.
+  - **Discounts:** the discount taken off those invoices, counted on the issue date.
+  - **Revenue:** revenue from hours plus fees minus discounts.
+  - **Labour cost:** the same approved hours times the cost rate frozen on each entry.
+  - **Gross profit:** revenue minus labour cost.
+  - **Direct expenses:** expenses that have a client or a project, counted on the expense date.
+  - **Overhead:** expenses with neither a client nor a project, counted on the expense date.
+  - **Net profit:** gross profit minus direct expenses minus overhead.
+  - **Margin %:** net profit as a percentage of revenue, blank when revenue is zero.
+  - **Invoiced:** invoice subtotal minus discount, on the issue date. Tax is not included.
+  - **Collected:** payments received, on the payment date, with the tax share removed in proportion to each invoice (a payment on an invoice that is 10% tax counts as the payment less that tax share). Voided invoices are ignored.
+- **Accrual:** hours are reported when the work was done, not when they are invoiced or paid. Fees, discounts and invoiced amounts follow the invoice issue date, and collected follows the payment date, so Invoiced and Collected can differ from Revenue in any one period.
+- **Overhead by grouping:** month and quarter rows include overhead (every month in the range is shown, even empty ones). Client and project groupings do not spread overhead across clients; it appears in a single "Unallocated overhead" row instead. Every view ends with a Total row.
+- **Filters drop overhead:** choosing any client or project filter removes overhead everywhere, including the Unallocated row, since overhead belongs to no client. A project filter also leaves out fees and discounts, which have a client but no project.
+- **Project grouping:** rows are labelled "Client — Project". Fees, discounts, invoiced and collected amounts, and expenses that have a client but no project, appear in a "Client — no project" row for that client.
+- **Range limit:** more than 3 years between from and to is refused with "Choose a range of 3 years or less."
+- **CSV export:** the Export CSV button downloads the table as `pnl-{from}-to-{to}-by-{group}.csv`. It opens directly in Excel (UTF-8 with a byte-order mark). Amounts are plain numbers such as `1234.50`. Text starting with `=`, `+`, `-`, `@`, a tab or a line break gets a leading apostrophe, so a client named `=SUM(...)` cannot run as a spreadsheet formula.
+
 ## File storage
 
 Payment and expense files are uploaded from the browser straight to storage under a holding name (`incoming-*`), then checked by the server, which moves the good ones into place and removes the rest. Users can't overwrite or delete stored files outside the app; the database policies only allow adding holding-name uploads. Abandoned uploads (older than 24 hours) are swept the next time that payment's or expense's folder is touched.
