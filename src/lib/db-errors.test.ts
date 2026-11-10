@@ -108,6 +108,8 @@ describe('mapDbError', () => {
     ['payments_amount_chk', 'Enter an amount above 0.'],
     ['ATTACHMENT_NOT_FOUND', 'File not found.'],
     ['attachments_path_chk', "That file doesn't belong here."],
+    ['attachments_size_chk', 'Each file must be 10 MB or smaller.'],
+    ['attachments_mime_chk', 'Only PDF, PNG, JPEG or HEIC files can be attached.'],
   ]
 
   it.each(paymentCases)('payment error %s', (needle, expected) => {

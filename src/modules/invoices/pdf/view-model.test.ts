@@ -37,6 +37,7 @@ const invoice = (over: Partial<InvoiceDetail> = {}): InvoiceDetail => ({
   discountAmount: '0.00',
   taxAmount: '0.00',
   amountPaid: '0.00',
+  balanceDue: '0.00',
   pdfPath: null,
   billTo: { name: 'Snap Client', contactName: 'Snap Contact', email: 's@c.test', phone: null, address: '5 Snap Way' },
   from: { name: 'Snap Firm', address: '2 Snap St', contactName: null, contactEmail: 'f@snap.test', contactPhone: null, logoPath: null },

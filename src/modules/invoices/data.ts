@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { mapDbError } from '@/lib/db-errors'
 import type { InvoiceDiscountType, InvoiceLineKind, InvoiceStatus } from '@/lib/db-types'
+import { subtractMoney } from '@/lib/domain/money'
 import { fail, ok, type Result } from '@/lib/result'
 
 const NOT_FOUND = 'Invoice not found.'
@@ -44,6 +45,8 @@ export type InvoiceDetail = InvoiceListRow & {
   discountAmount: string
   taxAmount: string
   amountPaid: string
+  /** total - amount_paid, computed exactly. */
+  balanceDue: string
   pdfPath: string | null
   billTo: {
     name: string
@@ -222,6 +225,7 @@ export async function getInvoice(db: SupabaseClient, firmId: string, id: string)
     discountAmount: r.discount_amount,
     taxAmount: r.tax_amount,
     amountPaid: r.amount_paid,
+    balanceDue: subtractMoney(r.total, r.amount_paid),
     pdfPath: r.pdf_path,
     billTo:
       r.status === 'draft' || r.bill_to_name === null
