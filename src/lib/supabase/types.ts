@@ -678,6 +678,11 @@ isOneToOne: false
 "issue_invoice":
 { Args: { "p_invoice": string }; Returns: string
                            },
+"list_expenses":
+{ Args: { "p_category": string,"p_client": string,"p_firm": string,"p_from": string,"p_limit": number,"p_missing_receipt": boolean,"p_offset": number,"p_project": string,"p_to": string }; Returns: {
+              "amount": string,"category_id": string,"category_name": string,"client_id": string,"client_name": string,"id": string,"payee": string,"project_id": string,"project_name": string,"receipt_count": number,"spent_on": string
+            }[]
+                           },
 "my_assignments":
 { Args: { "p_firm": string }; Returns: {
               "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string
