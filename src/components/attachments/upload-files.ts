@@ -1,6 +1,13 @@
 import { displayFileName } from '@/lib/domain/attachments'
+import type { FormResult } from '@/lib/form'
 import { createBrowserDb } from '@/lib/supabase/browser'
-import { createUploadTargetsAction, finalizeUploadsAction } from '@/modules/payments/actions'
+import type { DeclaredFile, Rejected, UploadedItem, UploadTarget } from '@/modules/attachments/storage'
+
+/** The two server actions of the signed-upload flow, already bound to their owner. */
+export type UploadActions = {
+  createTargets: (files: DeclaredFile[]) => Promise<FormResult<{ targets: UploadTarget[]; rejected: Rejected[] }>>
+  finalize: (items: UploadedItem[]) => Promise<FormResult<{ added: number; rejected: Rejected[] }>>
+}
 
 /** Chosen files only: browsers send one empty, nameless File when nothing was picked. */
 export function takeFiles(formData: FormData): File[] {
@@ -17,21 +24,16 @@ export function takeFiles(formData: FormData): File[] {
  * Sends the files straight to storage with signed upload targets, then has the server check
  * and attach them. Returns the names of the files that were not attached; never throws.
  */
-export async function uploadPaymentFiles(
-  firmId: string,
-  invoiceId: string,
-  paymentId: string,
-  files: File[],
-): Promise<string[]> {
+export async function uploadFiles(files: File[], actions: UploadActions): Promise<string[]> {
   if (files.length === 0) return []
   const all = files.map((f) => displayFileName(f.name))
   try {
     const declared = files.map((f) => ({ name: f.name, size: f.size }))
-    const t = await createUploadTargetsAction(firmId, invoiceId, paymentId, declared)
+    const t = await actions.createTargets(declared)
     if (!t.ok) return all
     const failed = t.data.rejected.map((r) => r.name)
     const storage = createBrowserDb().storage.from('firm-files')
-    const items: { uploadPath: string; name: string }[] = []
+    const items: UploadedItem[] = []
     for (const target of t.data.targets) {
       const file = files[target.index]
       const up = await storage.uploadToSignedUrl(target.uploadPath, target.token, file, {
@@ -41,11 +43,14 @@ export async function uploadPaymentFiles(
       else items.push({ uploadPath: target.uploadPath, name: file.name })
     }
     if (items.length === 0) return failed
-    const fin = await finalizeUploadsAction(firmId, invoiceId, paymentId, items)
+    const fin = await actions.finalize(items)
     if (!fin.ok) return [...failed, ...items.map((i) => displayFileName(i.name))]
     return [...failed, ...fin.data.rejected.map((r) => r.name)]
   } catch (e) {
-    console.error('payment file upload failed', e)
+    console.error('file upload failed', e)
     return all
   }
 }
+
+/** The file types the server accepts (it still checks each file's signature). */
+export const FILE_ACCEPT = '.pdf,.png,.jpg,.jpeg,.heic,application/pdf,image/png,image/jpeg,image/heic'

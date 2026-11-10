@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+import { FileList } from '@/components/attachments/file-list'
+import { takeFiles, uploadFiles } from '@/components/attachments/upload-files'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,14 +10,15 @@ import { MAX_FILES_PER_UPLOAD, TOO_MANY_FILES } from '@/lib/domain/attachments'
 import { todayIso } from '@/lib/domain/dates'
 import { formatMoney } from '@/lib/domain/money'
 import {
+  createUploadTargetsAction,
   deleteAttachmentAction,
   deletePaymentAction,
+  finalizeUploadsAction,
   recordPaymentAction,
   updatePaymentAction,
 } from '@/modules/payments/actions'
 import type { PaymentRow } from '@/modules/payments/data'
 import { INVOICE_STATUS_LABEL } from '../status-label'
-import { takeFiles, uploadPaymentFiles } from './upload-files'
 import { useRun } from './use-run'
 
 const METHOD_LABEL: Record<string, string> = {
@@ -30,6 +33,13 @@ const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'
 const select = 'h-8 rounded-lg border bg-background px-2 text-sm'
 const TOO_MANY = { ok: false as const, error: TOO_MANY_FILES, fieldErrors: { files: TOO_MANY_FILES } }
+
+function uploadPaymentFiles(firmId: string, invoiceId: string, paymentId: string, files: File[]): Promise<string[]> {
+  return uploadFiles(files, {
+    createTargets: (declared) => createUploadTargetsAction(firmId, invoiceId, paymentId, declared),
+    finalize: (items) => finalizeUploadsAction(firmId, invoiceId, paymentId, items),
+  })
+}
 
 function notAttached(verb: 'recorded' | 'updated', names: string[]): string | null {
   return names.length === 0 ? null : `Payment ${verb}, but some files weren't attached: ${names.join(', ')}.`
@@ -151,35 +161,11 @@ function RecordForm({
 }
 
 function ExistingFiles({ firmId, invoiceId, payment }: { firmId: string; invoiceId: string; payment: PaymentRow }) {
-  const { pending, run, error } = useRun()
-  if (payment.attachments.length === 0) return null
   return (
-    <ul className="flex w-full flex-col gap-1 text-sm">
-      {payment.attachments.map((a) => (
-        <li key={a.id} className="flex items-center gap-2">
-          <span>{a.fileName}</span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            aria-label={`Remove ${a.fileName}`}
-            onClick={() => {
-              if (window.confirm(`Remove ${a.fileName}? This can't be undone.`)) {
-                run(() => deleteAttachmentAction(firmId, invoiceId, a.id))
-              }
-            }}
-          >
-            Remove
-          </Button>
-        </li>
-      ))}
-      {error && (
-        <li role="alert" className="text-destructive">
-          {error}
-        </li>
-      )}
-    </ul>
+    <FileList
+      files={payment.attachments}
+      onRemove={(attachmentId) => deleteAttachmentAction(firmId, invoiceId, attachmentId)}
+    />
   )
 }
 

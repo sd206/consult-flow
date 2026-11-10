@@ -35,15 +35,28 @@ function parseForm(formData: FormData) {
   })
 }
 
-/** Creates the expense and opens it; receipts are added there (createExpenseUploadTargetsAction). */
-export async function createExpenseAction(firmId: string, formData: FormData): Promise<FormResult> {
+async function create(firmId: string, formData: FormData): Promise<FormResult<{ id: string }>> {
   const { db } = await requireFirmRole(firmId, [...MANAGERS])
   const parsed = parseForm(formData)
   if (!parsed.success) return fieldErrorsOf(parsed.error)
   const created = await createExpense(db, firmId, parsed.data)
+  if (created.ok) revalidate(firmId)
+  return created
+}
+
+/** Creates the expense and opens it; receipts are added there (createExpenseUploadTargetsAction). */
+export async function createExpenseAction(firmId: string, formData: FormData): Promise<FormResult> {
+  const created = await create(firmId, formData)
   if (!created.ok) return created
-  revalidate(firmId)
   redirect(`/f/${firmId}/expenses/${created.data.id}?added=1`)
+}
+
+/**
+ * Creates the expense and returns its id, for the new-expense form: the browser then sends the
+ * receipts straight to storage and opens the expense itself (a redirect here would skip that).
+ */
+export async function createExpenseForUploadAction(firmId: string, formData: FormData): Promise<FormResult<{ id: string }>> {
+  return create(firmId, formData)
 }
 
 export async function updateExpenseAction(firmId: string, expenseId: string, formData: FormData): Promise<FormResult> {
