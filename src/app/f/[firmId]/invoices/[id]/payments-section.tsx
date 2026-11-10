@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MAX_FILES_PER_UPLOAD, TOO_MANY_FILES } from '@/lib/domain/attachments'
 import { todayIso } from '@/lib/domain/dates'
 import { formatMoney } from '@/lib/domain/money'
 import {
@@ -14,6 +15,7 @@ import {
 } from '@/modules/payments/actions'
 import type { PaymentRow } from '@/modules/payments/data'
 import { INVOICE_STATUS_LABEL } from '../status-label'
+import { takeFiles, uploadPaymentFiles } from './upload-files'
 import { useRun } from './use-run'
 
 const METHOD_LABEL: Record<string, string> = {
@@ -27,6 +29,11 @@ const ACCEPT = '.pdf,.png,.jpg,.jpeg,.heic,application/pdf,image/png,image/jpeg,
 const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'
 const select = 'h-8 rounded-lg border bg-background px-2 text-sm'
+const TOO_MANY = { ok: false as const, error: TOO_MANY_FILES, fieldErrors: { files: TOO_MANY_FILES } }
+
+function notAttached(verb: 'recorded' | 'updated', names: string[]): string | null {
+  return names.length === 0 ? null : `Payment ${verb}, but some files weren't attached: ${names.join(', ')}.`
+}
 
 type Props = {
   firmId: string
@@ -36,6 +43,8 @@ type Props = {
   amountPaid: string
   balanceDue: string
   payments: PaymentRow[]
+  /** Set when the payments could not be loaded; shown instead of an empty list. */
+  paymentsError?: string | null
 }
 
 function MethodSelect({ id, defaultValue }: { id: string; defaultValue?: string }) {
@@ -84,8 +93,11 @@ function RecordForm({
         onWarning(null)
         run(
           async () => {
+            const files = takeFiles(fd)
+            if (files.length > MAX_FILES_PER_UPLOAD) return TOO_MANY
             const r = await recordPaymentAction(firmId, invoiceId, fd)
-            if (r.ok) onWarning(r.data.fileWarning)
+            if (!r.ok) return r
+            onWarning(notAttached('recorded', await uploadPaymentFiles(firmId, invoiceId, r.data.id, files)))
             return r
           },
           () => setResets((n) => n + 1),
@@ -152,7 +164,11 @@ function ExistingFiles({ firmId, invoiceId, payment }: { firmId: string; invoice
             size="sm"
             disabled={pending}
             aria-label={`Remove ${a.fileName}`}
-            onClick={() => run(() => deleteAttachmentAction(firmId, invoiceId, a.id))}
+            onClick={() => {
+              if (window.confirm(`Remove ${a.fileName}? This can't be undone.`)) {
+                run(() => deleteAttachmentAction(firmId, invoiceId, a.id))
+              }
+            }}
           >
             Remove
           </Button>
@@ -187,10 +203,15 @@ function EditForm({
       onSubmit={(e) => {
         e.preventDefault()
         const fd = new FormData(e.currentTarget)
+        setWarning(null)
         run(async () => {
+          const files = takeFiles(fd)
+          if (files.length > MAX_FILES_PER_UPLOAD) return TOO_MANY
           const r = await updatePaymentAction(firmId, invoiceId, p.id, fd)
-          if (r.ok && r.data.fileWarning) setWarning(r.data.fileWarning)
-          else if (r.ok) onDone()
+          if (!r.ok) return r
+          const warning = notAttached('updated', await uploadPaymentFiles(firmId, invoiceId, p.id, files))
+          if (warning) setWarning(warning)
+          else onDone()
           return r
         })
       }}
@@ -311,7 +332,16 @@ function PaymentRowView({
   )
 }
 
-export function PaymentsSection({ firmId, invoiceId, status, currency, amountPaid, balanceDue, payments }: Props) {
+export function PaymentsSection({
+  firmId,
+  invoiceId,
+  status,
+  currency,
+  amountPaid,
+  balanceDue,
+  payments,
+  paymentsError,
+}: Props) {
   const editable = status !== 'void'
   const canRecord = status === 'issued' || status === 'partly_paid'
   const [warning, setWarning] = useState<string | null>(null)
@@ -338,7 +368,11 @@ export function PaymentsSection({ firmId, invoiceId, status, currency, amountPai
         </div>
       </dl>
 
-      {payments.length > 0 ? (
+      {paymentsError ? (
+        <p role="alert" className="mt-4 text-sm text-destructive">
+          {paymentsError}
+        </p>
+      ) : payments.length > 0 ? (
         <table className="mt-4 w-full text-left text-sm">
           <thead>
             <tr className="border-b">

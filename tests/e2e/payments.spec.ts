@@ -29,7 +29,9 @@ async function open(page: Page, f: Awaited<ReturnType<typeof newFirm>>, invoiceI
 
 const form = (page: Page) => page.getByRole('form', { name: 'Record payment' })
 
-async function record(page: Page, amount: string, extra: { reference?: string; file?: string } = {}) {
+type FileArg = string | { name: string; mimeType: string; buffer: Buffer }
+
+async function record(page: Page, amount: string, extra: { reference?: string; file?: FileArg } = {}) {
   const fm = form(page)
   await fm.getByLabel('Amount').fill(amount)
   await fm.getByLabel('Method').selectOption({ label: 'Bank transfer' })
@@ -123,8 +125,46 @@ test('remove an attached file while editing', async ({ page }) => {
   const row = page.getByRole('row', { name: /TRX-RM/ })
   await expect(row.getByRole('link', { name: 'remittance.pdf' })).toBeVisible()
   await row.getByRole('button', { name: 'Edit' }).click()
+  let message = ''
+  page.once('dialog', (d) => {
+    message = d.message()
+    void d.accept()
+  })
   await page.getByRole('form', { name: 'Edit payment' }).getByRole('button', { name: 'Remove remittance.pdf' }).click()
   await expect(page.getByRole('link', { name: 'remittance.pdf' })).toHaveCount(0)
+  expect(message).toBe("Remove remittance.pdf? This can't be undone.")
+})
+
+test('a file larger than a request body limit goes straight to storage', async ({ page }) => {
+  const { f, invoiceId } = await setup('Pay Big File Firm', '987.65')
+  await open(page, f, invoiceId)
+  // ~6 MB valid PDF: over Vercel's 4.5 MB request cap, under the 10 MB attachment limit.
+  const buffer = Buffer.alloc(6 * 1024 * 1024, 0x20)
+  buffer.write('%PDF-1.4\n', 0, 'latin1')
+  await record(page, '87.65', { reference: 'TRX-BIG', file: { name: 'big-remittance.pdf', mimeType: 'application/pdf', buffer } })
+  await expect(page.getByTestId('status')).toHaveText('Partly paid')
+  const row = page.getByRole('row', { name: /TRX-BIG/ })
+  const link = row.getByRole('link', { name: 'big-remittance.pdf' })
+  await expect(link).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: "weren't attached" })).toHaveCount(0)
+  const res = await page.request.get((await link.getAttribute('href'))!)
+  expect(res.status()).toBe(200)
+  expect(res.headers()['content-type']).toContain('application/pdf')
+  const body = await res.body()
+  expect(body.length).toBe(buffer.length)
+  expect(body.subarray(0, 9).toString('latin1')).toBe('%PDF-1.4\n')
+})
+
+test('the download link redirects to a short-lived storage link', async ({ page }) => {
+  const { f, invoiceId } = await setup('Pay Redirect Firm', '432.10')
+  await open(page, f, invoiceId)
+  await record(page, '32.10', { reference: 'TRX-RED', file: REMITTANCE })
+  const link = page.getByRole('row', { name: /TRX-RED/ }).getByRole('link', { name: 'remittance.pdf' })
+  await expect(link).toBeVisible()
+  const res = await page.request.get((await link.getAttribute('href'))!, { maxRedirects: 0 })
+  expect(res.status()).toBe(302)
+  expect(res.headers()['cache-control']).toBe('private, no-store')
+  expect(res.headers()['location']).toContain('/storage/v1/object/sign/firm-files/')
 })
 
 test('consultant cannot download an attachment', async ({ page, browser, baseURL }) => {

@@ -1,16 +1,17 @@
 import { beforeAll, describe, expect, it } from 'vitest'
+import { validateAttachment } from '@/lib/domain/attachments'
+import { deletePayment, listPayments, recordPayment, updatePaymentDetails } from '@/modules/payments/data'
 import {
-  deletePayment,
-  listPayments,
-  recordPayment,
-  updatePaymentDetails,
-  type UploadFile,
-} from '@/modules/payments/data'
-import { attachFiles, deleteAttachment, readAttachment } from '@/modules/payments/storage'
+  attachmentDownloadUrl,
+  createUploadTargets,
+  deleteAttachment,
+  finalizeUploads,
+} from '@/modules/payments/storage'
 import { adminDb, newFirm } from './helpers'
 import { issueManualInvoice } from './invoice-fixtures'
 
 type Firm = Awaited<ReturnType<typeof newFirm>>
+type TestFile = { name: string; bytes: Uint8Array }
 
 function must<T>(r: { ok: true; data: T } | { ok: false; error: string }): T {
   if (!r.ok) throw new Error(r.error)
@@ -18,16 +19,17 @@ function must<T>(r: { ok: true; data: T } | { ok: false; error: string }): T {
 }
 
 const input = { amount: '400.00', paidOn: '2026-11-02', method: 'bank_transfer' as const, reference: null, notes: null }
+const NOT_HERE = "That file doesn't belong here."
 
-function pdf(name = 'a.pdf', extra = 20): UploadFile {
+function pdf(name = 'a.pdf', extra = 20): TestFile {
   const bytes = new Uint8Array(extra + 5)
   bytes.set([0x25, 0x50, 0x44, 0x46, 0x2d])
-  return { name, type: 'application/pdf', size: bytes.length, bytes }
+  return { name, bytes }
 }
-function png(name = 'b.png'): UploadFile {
+function png(name = 'b.png'): TestFile {
   const bytes = new Uint8Array(30)
   bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
-  return { name, type: 'image/png', size: bytes.length, bytes }
+  return { name, bytes }
 }
 
 async function folder(f: Firm, paymentId: string): Promise<string[]> {
@@ -36,6 +38,23 @@ async function folder(f: Firm, paymentId: string): Promise<string[]> {
     .list(`firms/${f.firmId}/attachments/payments/${paymentId}`)
   if (error) throw new Error(error.message)
   return (data ?? []).map((o) => o.name)
+}
+
+/** The browser flow: ask for targets, upload straight to storage, then finalize. */
+async function attach(f: Firm, paymentId: string, files: TestFile[], validate?: Parameters<typeof finalizeUploads>[4]) {
+  const declared = files.map((x) => ({ name: x.name, size: x.bytes.length }))
+  const t = must(await createUploadTargets(f.manager.db, f.firmId, paymentId, declared))
+  expect(t.rejected).toEqual([])
+  for (const target of t.targets) {
+    const up = await f.manager.db.storage
+      .from('firm-files')
+      .uploadToSignedUrl(target.uploadPath, target.token, files[target.index].bytes, {
+        contentType: 'application/octet-stream',
+      })
+    expect(up.error).toBeNull()
+  }
+  const items = t.targets.map((x) => ({ uploadPath: x.uploadPath, name: files[x.index].name }))
+  return must(await finalizeUploads(f.manager.db, f.firmId, paymentId, items, validate))
 }
 
 async function setup(f: Firm, total = 1000) {
@@ -59,73 +78,174 @@ describe('payments data', () => {
     expect(rows[0].attachments).toEqual([])
   })
 
-  it('attaches valid files with sniffed MIME types', async () => {
+  it('attaches valid files uploaded straight to storage, with sniffed MIME types', async () => {
     const { invoiceId, paymentId } = await setup(f)
-    const r = must(await attachFiles(f.manager.db, f.firmId, paymentId, [pdf(), png()]))
-    expect(r.added).toBe(2)
-    expect(r.rejected).toEqual([])
+    const r = await attach(f, paymentId, [pdf(), png()])
+    expect(r).toEqual({ added: 2, rejected: [] })
     const rows = must(await listPayments(f.manager.db, f.firmId, invoiceId))
     expect(rows[0].attachments.map((a) => a.mimeType).sort()).toEqual(['application/pdf', 'image/png'])
-    expect(await folder(f, paymentId)).toHaveLength(2)
+    expect(rows[0].attachments.map((a) => a.sizeBytes).sort()).toEqual([25, 30])
+    const names = await folder(f, paymentId)
+    expect(names).toHaveLength(2)
+    expect(names.some((n) => n.startsWith('incoming-'))).toBe(false)
   })
 
-  it('rejects a disguised file and uploads nothing', async () => {
+  it('issues upload targets in the payment folder only', async () => {
+    const { paymentId } = await setup(f)
+    const t = must(await createUploadTargets(f.manager.db, f.firmId, paymentId, [{ name: 'a.pdf', size: 10 }]))
+    expect(t.rejected).toEqual([])
+    expect(t.targets).toHaveLength(1)
+    expect(t.targets[0].index).toBe(0)
+    expect(t.targets[0].uploadPath).toMatch(
+      new RegExp(`^firms/${f.firmId}/attachments/payments/${paymentId}/incoming-[0-9a-f-]{36}$`),
+    )
+    expect(t.targets[0].token).toBeTruthy()
+  })
+
+  it('rejects an empty or oversize declared file before issuing a target', async () => {
+    const { paymentId } = await setup(f)
+    const t = must(
+      await createUploadTargets(f.manager.db, f.firmId, paymentId, [
+        { name: 'big.pdf', size: 10_485_761 },
+        { name: 'ok.pdf', size: 10_485_760 },
+        { name: 'empty.pdf', size: 0 },
+      ]),
+    )
+    expect(t.targets.map((x) => x.index)).toEqual([1])
+    expect(t.rejected).toEqual([
+      { name: 'big.pdf', error: 'Each file must be 10 MB or smaller.' },
+      { name: 'empty.pdf', error: 'That file is empty.' },
+    ])
+  })
+
+  it('refuses more than 5 files', async () => {
+    const { paymentId } = await setup(f)
+    const files = Array.from({ length: 6 }, (_, i) => ({ name: `f${i}.pdf`, size: 25 }))
+    expect(await createUploadTargets(f.manager.db, f.firmId, paymentId, files)).toEqual({
+      ok: false,
+      error: 'Attach up to 5 files at a time.',
+    })
+    const items = files.map((x, i) => ({
+      uploadPath: `firms/${f.firmId}/attachments/payments/${paymentId}/incoming-${i}`,
+      name: x.name,
+    }))
+    expect(await finalizeUploads(f.manager.db, f.firmId, paymentId, items)).toEqual({
+      ok: false,
+      error: 'Attach up to 5 files at a time.',
+    })
+  })
+
+  it('refuses targets for another firm payment or a void invoice', async () => {
+    const { paymentId } = await setup(f)
+    const g = await newFirm('Target Other Firm')
+    expect(await createUploadTargets(g.admin.db, g.firmId, paymentId, [{ name: 'a.pdf', size: 5 }])).toEqual({
+      ok: false,
+      error: 'Payment not found.',
+    })
+    const { invoiceId, paymentId: p2 } = await setup(f)
+    const { error } = await adminDb().from('invoices').update({ status: 'void' }).eq('id', invoiceId)
+    expect(error).toBeNull()
+    expect(await createUploadTargets(f.manager.db, f.firmId, p2, [{ name: 'a.pdf', size: 5 }])).toEqual({
+      ok: false,
+      error: "Payments on this invoice can't be changed.",
+    })
+  })
+
+  it('rejects a disguised file on finalize and removes the upload', async () => {
     const { paymentId } = await setup(f)
     const bytes = new Uint8Array(40)
     bytes.set([0x4d, 0x5a])
-    const evil: UploadFile = { name: 'invoice.pdf', type: 'application/pdf', size: 40, bytes }
-    const r = must(await attachFiles(f.manager.db, f.firmId, paymentId, [evil]))
-    expect(r.added).toBe(0)
-    expect(r.rejected).toEqual([{ name: 'invoice.pdf', error: 'Only PDF, PNG, JPEG or HEIC files can be attached.' }])
+    const r = await attach(f, paymentId, [{ name: 'invoice.pdf', bytes }])
+    expect(r).toEqual({
+      added: 0,
+      rejected: [{ name: 'invoice.pdf', error: 'Only PDF, PNG, JPEG or HEIC files can be attached.' }],
+    })
     expect(await folder(f, paymentId)).toEqual([])
   })
 
-  it('rejects an oversize file', async () => {
+  it('storage refuses an oversize upload, and finalize reports the file', async () => {
     const { paymentId } = await setup(f)
+    // Declares a small size, then sends more than the bucket's 10 MB limit.
+    const t = must(await createUploadTargets(f.manager.db, f.firmId, paymentId, [{ name: 'big.pdf', size: 100 }]))
+    const [target] = t.targets
     const big = pdf('big.pdf', 10_485_761 - 5)
-    expect(big.size).toBe(10_485_761)
-    const r = must(await attachFiles(f.manager.db, f.firmId, paymentId, [big]))
-    expect(r.added).toBe(0)
-    expect(r.rejected[0].error).toBe('Each file must be 10 MB or smaller.')
+    const up = await f.manager.db.storage
+      .from('firm-files')
+      .uploadToSignedUrl(target.uploadPath, target.token, big.bytes, { contentType: 'application/pdf' })
+    expect(up.error).not.toBeNull()
+    const r = must(
+      await finalizeUploads(f.manager.db, f.firmId, paymentId, [{ uploadPath: target.uploadPath, name: 'big.pdf' }]),
+    )
+    expect(r).toEqual({ added: 0, rejected: [{ name: 'big.pdf', error: "The file couldn't be uploaded." }] })
     expect(await folder(f, paymentId)).toEqual([])
   })
 
-  it('refuses more than 5 files before uploading', async () => {
+  it('checks the size of the stored bytes on finalize', async () => {
     const { paymentId } = await setup(f)
-    const files = Array.from({ length: 6 }, (_, i) => pdf(`f${i}.pdf`))
-    const r = await attachFiles(f.manager.db, f.firmId, paymentId, files)
-    expect(r).toEqual({ ok: false, error: 'Attach up to 5 files at a time.' })
+    let seen = -1
+    const spy: Parameters<typeof finalizeUploads>[4] = (file) => {
+      seen = file.bytes.length
+      return validateAttachment({ ...file, size: 10_485_761 })
+    }
+    const r = await attach(f, paymentId, [pdf()], spy)
+    expect(seen).toBe(25)
+    expect(r).toEqual({ added: 0, rejected: [{ name: 'a.pdf', error: 'Each file must be 10 MB or smaller.' }] })
     expect(await folder(f, paymentId)).toEqual([])
   })
 
-  it('removes the uploaded object when recording the attachment fails', async () => {
+  it('refuses a path outside the payment incoming folder and leaves it alone', async () => {
     const { paymentId } = await setup(f)
-    // A validator returning a MIME the DB rejects makes add_payment_attachment fail after the upload.
+    const { paymentId: other } = await setup(f)
+    await attach(f, other, [pdf()])
+    const [kept] = await folder(f, other)
+    const base = `firms/${f.firmId}/attachments/payments`
+    const items = [
+      { uploadPath: `${base}/${other}/${kept}`, name: 'steal.pdf' },
+      { uploadPath: `${base}/${paymentId}/incoming-../../${other}/${kept}`, name: 'dots.pdf' },
+      { uploadPath: `${base}/${paymentId}/${kept}`, name: 'plain.pdf' },
+    ]
+    const r = must(await finalizeUploads(f.manager.db, f.firmId, paymentId, items))
+    expect(r).toEqual({
+      added: 0,
+      rejected: [
+        { name: 'steal.pdf', error: NOT_HERE },
+        { name: 'dots.pdf', error: NOT_HERE },
+        { name: 'plain.pdf', error: NOT_HERE },
+      ],
+    })
+    expect(await folder(f, other)).toEqual([kept])
+  })
+
+  it('removes the stored object when recording the attachment fails', async () => {
+    const { paymentId } = await setup(f)
+    // A validator returning a MIME the DB rejects makes add_payment_attachment fail after the move.
     const lying = () => ({ ok: true as const, data: { kind: 'pdf' as const, ext: 'pdf' as const, mime: 'text/plain' } })
-    const r = must(await attachFiles(f.manager.db, f.firmId, paymentId, [pdf()], lying))
+    const r = await attach(f, paymentId, [pdf()], lying)
     expect(r.added).toBe(0)
     expect(r.rejected).toHaveLength(1)
     expect(await folder(f, paymentId)).toEqual([])
   })
 
-  it('reads an attachment, and refuses another firm', async () => {
+  it('gives a short-lived download link for an attachment, and refuses another firm', async () => {
     const { invoiceId, paymentId } = await setup(f)
-    must(await attachFiles(f.manager.db, f.firmId, paymentId, [png()]))
+    await attach(f, paymentId, [png()])
     const att = must(await listPayments(f.manager.db, f.firmId, invoiceId))[0].attachments[0]
-    const read = must(await readAttachment(f.manager.db, f.firmId, att.id))
-    expect(read.mimeType).toBe('image/png')
-    expect(read.fileName).toBe('b.png')
-    expect(read.bytes.length).toBe(30)
-    expect(read.bytes[1]).toBe(0x50)
+    const link = must(await attachmentDownloadUrl(f.manager.db, f.firmId, att.id))
+    const res = await fetch(link.url)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-disposition')).toContain('b.png')
+    const body = new Uint8Array(await res.arrayBuffer())
+    expect(body.length).toBe(30)
+    expect(body[1]).toBe(0x50)
 
     const g = await newFirm('Other Firm')
-    expect((await readAttachment(g.admin.db, g.firmId, att.id)).ok).toBe(false)
-    expect((await readAttachment(g.admin.db, f.firmId, att.id)).ok).toBe(false)
+    expect((await attachmentDownloadUrl(g.admin.db, g.firmId, att.id)).ok).toBe(false)
+    expect((await attachmentDownloadUrl(g.admin.db, f.firmId, att.id)).ok).toBe(false)
   })
 
   it('deletes a payment, its files and recomputes the invoice', async () => {
     const { invoiceId, paymentId } = await setup(f)
-    must(await attachFiles(f.manager.db, f.firmId, paymentId, [pdf(), png()]))
+    await attach(f, paymentId, [pdf(), png()])
     expect(await folder(f, paymentId)).toHaveLength(2)
     must(await deletePayment(f.manager.db, f.firmId, paymentId))
     expect(await folder(f, paymentId)).toEqual([])
@@ -136,7 +256,7 @@ describe('payments data', () => {
 
   it('deletes a single attachment and its file', async () => {
     const { invoiceId, paymentId } = await setup(f)
-    must(await attachFiles(f.manager.db, f.firmId, paymentId, [pdf()]))
+    await attach(f, paymentId, [pdf()])
     const att = must(await listPayments(f.manager.db, f.firmId, invoiceId))[0].attachments[0]
     must(await deleteAttachment(f.manager.db, f.firmId, att.id))
     expect(await folder(f, paymentId)).toEqual([])
@@ -178,5 +298,14 @@ describe('payments data', () => {
       error: 'Payment not found.',
     })
     expect(await listPayments(f.manager.db, f.firmId, invoiceId)).toEqual({ ok: false, error: 'Invoice not found.' })
+    expect(await createUploadTargets(f.manager.db, f.firmId, pay.id, [{ name: 'a.pdf', size: 5 }])).toEqual({
+      ok: false,
+      error: 'Payment not found.',
+    })
+    expect(
+      await finalizeUploads(f.manager.db, f.firmId, pay.id, [
+        { uploadPath: `firms/${f.firmId}/attachments/payments/${pay.id}/incoming-x`, name: 'a.pdf' },
+      ]),
+    ).toEqual({ ok: false, error: 'Payment not found.' })
   })
 })

@@ -162,6 +162,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ firmId
         amountPaid={inv.amountPaid}
         balanceDue={inv.balanceDue}
         payments={paymentsRes.ok ? paymentsRes.data : []}
+        paymentsError={paymentsRes.ok ? null : paymentsRes.error}
       />
 
       <IssuedActions firmId={firmId} invoiceId={inv.id} status={inv.status} hasPdf={!!inv.pdfPath} />

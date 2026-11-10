@@ -3,8 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   serverExternalPackages: ['@react-pdf/renderer'],
   experimental: {
-    // Logos (2 MB) and up to 5 payment attachments (10 MB each); headroom so oversize files reach the validators.
-    serverActions: { bodySizeLimit: "55mb" },
+    // Logos (2 MB) with headroom so an oversize logo reaches the validator. Payment files never pass
+    // through server actions: the browser uploads them straight to storage with signed upload URLs.
+    serverActions: { bodySizeLimit: "3mb" },
   },
 };
 

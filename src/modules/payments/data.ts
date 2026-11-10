@@ -17,8 +17,6 @@ export type PaymentRow = {
   attachments: { id: string; fileName: string; mimeType: string; sizeBytes: number }[]
 }
 
-export type UploadFile = { name: string; type: string; size: number; bytes: Uint8Array }
-
 export type PaymentDetails = { paidOn: string; method: PaymentMethod; reference: string | null; notes: string | null }
 
 /** Payment-scoped RPCs take only the row id, so confirm it belongs to firmId first. */
