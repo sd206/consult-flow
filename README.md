@@ -73,6 +73,19 @@ npm run test:e2e    # Playwright; needs local Supabase running
 - **Unpaid invoices** (Invoices, then Unpaid invoices): balance due per invoice, filterable by client, with ageing by days past the due date: not yet due, 1-30, 31-60, 61-90 and over 90 days. The dashboard shows the outstanding and overdue totals.
 - **Voiding:** an invoice with payments can't be voided; delete its payments first.
 
+## Expenses
+
+- **Who:** Admins and Managers record, edit and delete expenses at `/f/{firmId}/expenses`. Consultants see nothing of this.
+- **Amount:** one amount per expense, tax included. Tax is not tracked separately. The date can't be in the future.
+- **Client follows the project:** choosing a project sets the expense's client from it, and if a project's client later changes, its expenses move with it. An expense with no project can have a client chosen directly, or none.
+- **Categories** (Expenses → Categories): each firm starts with Travel, Software, Office, Contractors, Professional fees and Other. Names are unique within a firm (ignoring case and surrounding spaces). A category can be retired, so it can't be chosen for new or re-categorised expenses while existing expenses keep it, and restored later. A category can only be deleted while no expense uses it.
+- **Receipts:** optional, but expenses without one are flagged "No receipt" in the list, and the list can be filtered to those. Files follow the same rules as payment files: PDF, PNG, JPEG or HEIC, up to 10 MB each and 5 per upload, checked by their content. Downloads use a short-lived storage link. Deleting an expense deletes its receipts too.
+- **Totals:** the list shows the number of expenses and their combined amount for the current filters (date range, category, client, project, no receipt only), not just the visible page.
+
+## File storage
+
+Payment and expense files are uploaded from the browser straight to storage under a holding name (`incoming-*`), then checked by the server, which moves the good ones into place and removes the rest. Users can't overwrite or delete stored files outside the app; the database policies only allow adding holding-name uploads. Abandoned uploads (older than 24 hours) are swept the next time that payment's or expense's folder is touched.
+
 ## Hosted Supabase
 
 ### Platform owner
