@@ -1,4 +1,8 @@
+'use client'
+
+import { useState } from 'react'
 import type { PnlParams } from '@/modules/reports/pnl'
+import { MultiSelect, type MultiSelectGroup } from './multi-select'
 
 type ClientOpt = { id: string; name: string }
 type ProjectOpt = { id: string; name: string; clientId: string; clientName: string }
@@ -18,6 +22,7 @@ export function PnlFilters({
   from,
   to,
   group,
+  split,
   clients,
   projects,
   selectedClients,
@@ -28,22 +33,31 @@ export function PnlFilters({
   from: string
   to: string
   group: PnlParams['group']
+  split: PnlParams['split']
   clients: ClientOpt[]
   projects: ProjectOpt[]
   selectedClients: string[]
   selectedProjects: string[]
   exportQuery: string
 }) {
+  // The group is tracked so the "Add columns" choices follow it before submitting.
+  const [groupBy, setGroupBy] = useState(group)
+  const [splitClient, setSplitClient] = useState(split.client)
+  const [splitProject, setSplitProject] = useState(split.project)
+  const periodic = groupBy === 'month' || groupBy === 'quarter'
+
   const byClient = new Map<string, { name: string; items: ProjectOpt[] }>()
   for (const p of projects) {
     const g = byClient.get(p.clientId) ?? { name: p.clientName, items: [] }
     g.items.push(p)
     byClient.set(p.clientId, g)
   }
-  const groups = [...byClient.values()].sort((a, b) => a.name.localeCompare(b.name))
+  const projectGroups: MultiSelectGroup[] = [...byClient.values()]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((g) => ({ heading: g.name, options: g.items.map((p) => ({ id: p.id, name: p.name })) }))
 
   return (
-    <form method="get" aria-label="Report filters" className="mt-4 space-y-4 text-sm">
+    <form method="get" aria-label="Report filters" className="mt-4 space-y-3 text-sm">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1">
           <label htmlFor="pnl-from">From</label>
@@ -55,7 +69,13 @@ export function PnlFilters({
         </div>
         <div className="flex flex-col gap-1">
           <label htmlFor="pnl-group">Group by</label>
-          <select id="pnl-group" name="group" defaultValue={group} className={input}>
+          <select
+            id="pnl-group"
+            name="group"
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as PnlParams['group'])}
+            className={input}
+          >
             {GROUPS.map((g) => (
               <option key={g.value} value={g.value}>
                 {g.label}
@@ -63,6 +83,21 @@ export function PnlFilters({
             ))}
           </select>
         </div>
+        <MultiSelect
+          label="Clients"
+          name="client"
+          groups={[{ heading: null, options: clients }]}
+          selected={selectedClients}
+          noun={{ all: 'All clients', plural: 'clients' }}
+        />
+        <MultiSelect
+          label="Projects"
+          name="project"
+          groups={projectGroups}
+          selected={selectedProjects}
+          noun={{ all: 'All projects', plural: 'projects' }}
+          hint="Projects narrow the selected clients"
+        />
         <button type="submit" className={`${button} bg-primary text-primary-foreground hover:bg-primary-hover`}>
           Show report
         </button>
@@ -71,32 +106,39 @@ export function PnlFilters({
         </a>
       </div>
 
-      <fieldset className="space-y-1">
-        <legend className="font-medium">Clients</legend>
-        <div className="flex flex-wrap gap-x-4 gap-y-1">
-          {clients.map((c) => (
-            <label key={c.id} className="flex items-center gap-1.5">
-              <input type="checkbox" name="client" value={c.id} defaultChecked={selectedClients.includes(c.id)} />
-              {c.name}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className="space-y-2">
-        <legend className="font-medium">Projects</legend>
-        <p className="text-muted-foreground">Projects narrow the selected clients</p>
-        {groups.map((g) => (
-          <div key={g.name} className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            <span className="text-muted-foreground">{g.name}</span>
-            {g.items.map((p) => (
-              <label key={p.id} className="flex items-center gap-1.5">
-                <input type="checkbox" name="project" value={p.id} defaultChecked={selectedProjects.includes(p.id)} />
-                {p.name}
+      <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <legend className="float-left mr-4 font-medium">Add columns:</legend>
+        {groupBy === 'project' ? (
+          <span className="text-muted-foreground">Project grouping always shows Client and Project columns.</span>
+        ) : (
+          <>
+            {/* Client grouping already has one row per client, so only Project applies. */}
+            {periodic && (
+              <label className="flex items-center gap-1.5">
+                {/* A project split implies the client column: projects belong to clients. */}
+                <input
+                  type="checkbox"
+                  name="split"
+                  value="client"
+                  checked={splitClient || splitProject}
+                  disabled={splitProject}
+                  onChange={(e) => setSplitClient(e.target.checked)}
+                />
+                Client
               </label>
-            ))}
-          </div>
-        ))}
+            )}
+            <label className="flex items-center gap-1.5">
+              <input
+                type="checkbox"
+                name="split"
+                value="project"
+                checked={splitProject}
+                onChange={(e) => setSplitProject(e.target.checked)}
+              />
+              Project
+            </label>
+          </>
+        )}
       </fieldset>
     </form>
   )
