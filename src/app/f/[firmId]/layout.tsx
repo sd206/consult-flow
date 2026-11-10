@@ -15,6 +15,7 @@ const NAV: NavItem[] = [
   { label: 'Invoices', path: '/invoices', roles: MANAGERS },
   { label: 'Unpaid', path: '/invoices/unpaid', roles: MANAGERS },
   { label: 'Expenses', path: '/expenses', roles: MANAGERS },
+  { label: 'Reports', path: '/reports/pnl', roles: MANAGERS },
   { label: 'Clients', path: '/clients', roles: MANAGERS },
   { label: 'Projects', path: '/projects', roles: MANAGERS },
   { label: 'Consultants', path: '/consultants', roles: MANAGERS },

@@ -86,6 +86,11 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
               My timesheet
             </Link>
           </p>
+          <p className="mt-2 text-sm">
+            <Link href={`/f/${firmId}/reports/pnl`} className="underline underline-offset-4">
+              Profit &amp; loss
+            </Link>
+          </p>
 
           <h2 className="mt-8 text-lg font-medium">Finish setup</h2>
           <ul className="mt-2 space-y-2 text-sm">
