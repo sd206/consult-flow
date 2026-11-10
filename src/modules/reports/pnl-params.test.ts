@@ -10,7 +10,14 @@ describe('parsePnlParams', () => {
   it('defaults to year-to-date by month', () => {
     expect(parsePnlParams({}, '2026-11-09')).toEqual({
       ok: true,
-      data: { from: '2026-01-01', to: '2026-11-09', group: 'month', clientIds: null, projectIds: null },
+      data: {
+        from: '2026-01-01',
+        to: '2026-11-09',
+        group: 'month',
+        clientIds: null,
+        projectIds: null,
+        split: { client: false, project: false },
+      },
     })
   })
 
@@ -42,5 +49,39 @@ describe('parsePnlParams', () => {
 
   it('rejects an unknown group', () => {
     expect(parsePnlParams({ group: 'week' }, '2026-11-09')).toEqual({ ok: false, error: GROUP_MSG })
+  })
+
+  describe('split', () => {
+    const split = (search: Record<string, string | string[]>) => {
+      const r = parsePnlParams(search, '2026-11-09')
+      if (!r.ok) throw new Error(r.error)
+      return r.data.split
+    }
+
+    it('is off by default and ignores unknown values', () => {
+      expect(split({})).toEqual({ client: false, project: false })
+      expect(split({ split: ['nope', 'Client'] })).toEqual({ client: false, project: false })
+    })
+
+    it('allows client, project or both under month and quarter', () => {
+      for (const group of ['month', 'quarter']) {
+        expect(split({ group, split: 'client' })).toEqual({ client: true, project: false })
+        expect(split({ group, split: ['client', 'project'] })).toEqual({ client: true, project: true })
+      }
+    })
+
+    it('a project split implies the client column under month and quarter', () => {
+      expect(split({ group: 'month', split: 'project' })).toEqual({ client: true, project: true })
+      expect(split({ group: 'quarter', split: ['project'] })).toEqual({ client: true, project: true })
+    })
+
+    it('allows only project under client grouping', () => {
+      expect(split({ group: 'client', split: 'client' })).toEqual({ client: false, project: false })
+      expect(split({ group: 'client', split: ['client', 'project'] })).toEqual({ client: false, project: true })
+    })
+
+    it('ignores every split under project grouping', () => {
+      expect(split({ group: 'project', split: ['client', 'project'] })).toEqual({ client: false, project: false })
+    })
   })
 })

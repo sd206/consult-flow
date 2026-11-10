@@ -1,7 +1,6 @@
-import type { PnlParams, PnlRow } from './pnl'
+import { pnlBreakdownColumns, type PnlParams, type PnlRow } from './pnl'
 
-const HEADER = [
-  'Group',
+const MEASURE_HEADER = [
   'Revenue from hours',
   'Fees',
   'Discounts',
@@ -22,15 +21,24 @@ export function csvField(value: string, opts: { text: boolean }): string {
   return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 
-function labelFor(row: PnlRow): string {
+function labelFor(row: PnlRow, params: PnlParams): string {
   if (row.kind === 'overhead') return 'Unallocated overhead'
   if (row.kind === 'total') return 'Total'
+  // Project grouping shows Client and Project as their own columns instead.
+  if (params.group === 'project') return ''
   return row.label
 }
 
 export function buildPnlCsv(rows: PnlRow[], params: PnlParams): { filename: string; body: string } {
-  const lines = [HEADER.map((h) => csvField(h, { text: true })).join(',')]
+  const cols = pnlBreakdownColumns(params)
+  const header = ['Group', ...(cols.client ? ['Client'] : []), ...(cols.project ? ['Project'] : []), ...MEASURE_HEADER]
+  const lines = [header.map((h) => csvField(h, { text: true })).join(',')]
   for (const r of rows) {
+    const labels = [
+      labelFor(r, params),
+      ...(cols.client ? [r.clientLabel ?? ''] : []),
+      ...(cols.project ? [r.projectLabel ?? ''] : []),
+    ]
     const nums = [
       r.revenueHours,
       r.fees,
@@ -45,11 +53,15 @@ export function buildPnlCsv(rows: PnlRow[], params: PnlParams): { filename: stri
       r.invoiced,
       r.collected,
     ]
-    lines.push([csvField(labelFor(r), { text: true }), ...nums.map((n) => csvField(n, { text: false }))].join(','))
+    lines.push(
+      [...labels.map((l) => csvField(l, { text: true })), ...nums.map((n) => csvField(n, { text: false }))].join(','),
+    )
   }
   const filtered = (params.clientIds?.length ?? 0) > 0 || (params.projectIds?.length ?? 0) > 0
+  const splitNames = [params.split.client && 'client', params.split.project && 'project'].filter(Boolean)
+  const withSplit = params.group !== 'project' && splitNames.length > 0 ? `-with-${splitNames.join('-')}` : ''
   return {
-    filename: `pnl-${params.from}-to-${params.to}-by-${params.group}${filtered ? '-filtered' : ''}.csv`,
+    filename: `pnl-${params.from}-to-${params.to}-by-${params.group}${withSplit}${filtered ? '-filtered' : ''}.csv`,
     body: `\uFEFF${lines.join('\r\n')}\r\n`,
   }
 }
