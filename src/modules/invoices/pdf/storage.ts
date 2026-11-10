@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { mapDbError } from '@/lib/db-errors'
 import { fail, ok, type Result } from '@/lib/result'
+import { createAdminDb } from '@/lib/supabase/admin'
 import { getTemplate } from '@/modules/invoice-templates/data'
 import { ensureInvoiceInFirm, getInvoice, setInvoicePdf, type InvoiceDetail } from '../data'
 import { renderInvoicePdf } from './render'
@@ -176,7 +177,9 @@ export async function generateAndStorePdf(
 
   const set = await setInvoicePdf(db, firmId, invoiceId, path)
   if (!set.ok) {
-    await db.storage.from(BUCKET).remove([path])
+    // Users can't delete invoice PDFs; the orphan goes via the service role (path built above, firm checked).
+    const rm = await createAdminDb().storage.from(BUCKET).remove([path])
+    if (rm.error) console.error('invoice PDF cleanup failed', rm.error)
     return set
   }
   return ok({ path })

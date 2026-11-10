@@ -33,15 +33,18 @@ describe('firm-files storage', () => {
 
   it('consultant cannot read non-logo firm files; manager and admin can', async () => {
     const f = await newFirm()
-    const path = `firms/${f.firmId}/attachments/x.pdf`
+    // Users may only create holding objects under attachments/ (20261109000022_storage_hardening.sql).
+    const dir = `firms/${f.firmId}/attachments/payments/${crypto.randomUUID()}`
+    const file = `incoming-${crypto.randomUUID()}`
+    const path = `${dir}/${file}`
     const pdf = new Blob([new TextEncoder().encode('%PDF-1.4')], { type: 'application/pdf' })
     expect((await f.manager.db.storage.from(BUCKET).upload(path, pdf)).error).toBeNull()
 
     const denied = await f.consultant.db.storage.from(BUCKET).download(path)
     expect(denied.error).not.toBeNull()
     expect(denied.data).toBeNull()
-    const listed = await f.consultant.db.storage.from(BUCKET).list(`firms/${f.firmId}/attachments`)
-    expect((listed.data ?? []).map((o) => o.name)).not.toContain('x.pdf')
+    const listed = await f.consultant.db.storage.from(BUCKET).list(dir)
+    expect((listed.data ?? []).map((o) => o.name)).not.toContain(file)
     const signed = await f.consultant.db.storage.from(BUCKET).createSignedUrl(path, 60)
     expect(signed.error).not.toBeNull()
 
@@ -57,7 +60,7 @@ describe('firm-files storage', () => {
     const up = await f.manager.db.storage.from(BUCKET).upload(logo, png())
     expect(up.error).not.toBeNull()
     expect(await exists(logo)).toBe(false)
-    const other = `firms/${f.firmId}/attachments/m.png`
+    const other = `firms/${f.firmId}/attachments/payments/${crypto.randomUUID()}/incoming-${crypto.randomUUID()}`
     const ok = await f.manager.db.storage.from(BUCKET).upload(other, png())
     expect(ok.error).toBeNull()
     expect(await exists(other)).toBe(true)
@@ -65,7 +68,11 @@ describe('firm-files storage', () => {
 
   it('consultant cannot write anywhere', async () => {
     const f = await newFirm()
-    for (const p of [`firms/${f.firmId}/logo/c.png`, `firms/${f.firmId}/attachments/c.png`]) {
+    for (const p of [
+      `firms/${f.firmId}/logo/c.png`,
+      `firms/${f.firmId}/attachments/payments/${crypto.randomUUID()}/incoming-${crypto.randomUUID()}`,
+      `firms/${f.firmId}/invoices/${crypto.randomUUID()}/c.pdf`,
+    ]) {
       const up = await f.consultant.db.storage.from(BUCKET).upload(p, png())
       expect(up.error).not.toBeNull()
       expect(await exists(p)).toBe(false)

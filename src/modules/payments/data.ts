@@ -2,9 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { mapDbError } from '@/lib/db-errors'
 import type { PaymentMethod } from '@/lib/db-types'
 import { fail, ok, type Result } from '@/lib/result'
+import { removeOwnerFolder } from '@/modules/attachments/storage'
 import { ensureInvoiceInFirm } from '@/modules/invoices/data'
-
-export const BUCKET = 'firm-files'
 const PAYMENT_NOT_FOUND = 'Payment not found.'
 
 export type PaymentRow = {
@@ -103,16 +102,19 @@ export async function updatePaymentDetails(
   return ok(undefined)
 }
 
-/** Deletes the payment (and its attachment rows), then its files. A file cleanup failure is logged only. */
+/**
+ * Deletes the payment (and its attachment rows), then everything in its folder, including
+ * abandoned uploads. A file cleanup failure is logged only.
+ */
 export async function deletePayment(db: SupabaseClient, firmId: string, paymentId: string): Promise<Result<void>> {
   const scope = await ensurePaymentInFirm(db, firmId, paymentId)
   if (!scope.ok) return scope
-  const { data, error } = await db.rpc('delete_payment', { p_payment: paymentId })
+  const { error } = await db.rpc('delete_payment', { p_payment: paymentId })
   if (error) return fail(mapDbError(error))
-  const paths = ((data ?? []) as string[]).filter((p) => typeof p === 'string')
-  if (paths.length > 0) {
-    const rm = await db.storage.from(BUCKET).remove(paths)
-    if (rm.error) console.error('payment file cleanup failed', rm.error)
+  try {
+    await removeOwnerFolder(firmId, { kind: 'payment', id: paymentId })
+  } catch (e) {
+    console.error('payment file cleanup failed', e)
   }
   return ok(undefined)
 }
