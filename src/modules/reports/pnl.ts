@@ -209,7 +209,14 @@ export async function getPnl(db: SupabaseClient, firmId: string, params: PnlPara
       out.push(r)
       continue
     }
-    for (const d of byGroup.get(r.key) ?? []) {
+    const details = byGroup.get(r.key) ?? []
+    // A group with no activity of its own (e.g. an idle month) stays a plain row,
+    // not a lone "subtotal" with nothing above it.
+    if (details.length === 0) {
+      out.push(r)
+      continue
+    }
+    for (const d of details) {
       out.push({
         kind: 'detail',
         key: `${r.key}:${d.sort_key}`,

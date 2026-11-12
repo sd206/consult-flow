@@ -152,9 +152,14 @@ export default async function PnlPage({
               <thead>
                 <tr className="border-b">
                   {[
-                    "Group",
-                    ...(cols.client ? ["Client"] : []),
-                    ...(cols.project ? ["Project"] : []),
+                    // Project grouping: Client and Project are the row labels (no Group column).
+                    ...(byProject
+                      ? ["Client", "Project"]
+                      : [
+                          "Group",
+                          ...(cols.client ? ["Client"] : []),
+                          ...(cols.project ? ["Project"] : []),
+                        ]),
                     "Revenue",
                     "Labour cost",
                     "Gross profit",
@@ -179,10 +184,10 @@ export default async function PnlPage({
                       : r.kind === "total"
                         ? "Total"
                         : r.label;
-                  // Project grouping shows the client and project in their own
-                  // columns; the combined label stays as the row header's name.
+                  // Project grouping: the client is the row header and the project
+                  // follows; Total / Unallocated overhead sit in the client column.
                   const shownLabel =
-                    byProject && r.kind === "group" ? "" : label;
+                    byProject && r.kind === "group" ? (r.clientLabel ?? "") : label;
                   const bold = r.kind === "total" || r.kind === "subtotal";
                   // Client and project rows have no overhead of their own.
                   const noOverhead =
@@ -198,16 +203,23 @@ export default async function PnlPage({
                     >
                       <th
                         scope="row"
-                        aria-label={shownLabel === label ? undefined : label}
                         className={`${td} text-left ${bold ? "font-bold" : "font-normal"}`}
                       >
                         {shownLabel}
                       </th>
-                      {cols.client && (
-                        <td className={td}>{r.clientLabel ?? ""}</td>
-                      )}
-                      {cols.project && (
-                        <td className={td}>{r.projectLabel ?? ""}</td>
+                      {byProject ? (
+                        <td className={td}>
+                          {r.kind === "group" ? (r.projectLabel ?? "") : ""}
+                        </td>
+                      ) : (
+                        <>
+                          {cols.client && (
+                            <td className={td}>{r.clientLabel ?? ""}</td>
+                          )}
+                          {cols.project && (
+                            <td className={td}>{r.projectLabel ?? ""}</td>
+                          )}
+                        </>
                       )}
                       <td className={td} title={tip}>
                         {money(r.revenue)}

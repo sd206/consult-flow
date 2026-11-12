@@ -157,7 +157,7 @@ describe('buildPnlCsv', () => {
       expect(l[1].startsWith('Globex,Portal,')).toBe(true)
     })
 
-    it('always has Client and Project columns under project grouping, Group blank on project rows', () => {
+    it('under project grouping uses Client and Project as the label columns (no Group column)', () => {
       const p: PnlParams = { ...params, group: 'project' }
       const rows = [
         mk({ kind: 'group', label: 'Globex — Portal', clientLabel: 'Globex', projectLabel: 'Portal' }),
@@ -165,10 +165,10 @@ describe('buildPnlCsv', () => {
         mk({ kind: 'total', label: 'y' }),
       ]
       const l = lines(buildPnlCsv(rows, p).body)
-      expect(l[0]).toBe(`Group,Client,Project,${HEAD_REST}`)
-      expect(l[1].startsWith(',Globex,Portal,2300.00')).toBe(true)
-      expect(l[2].startsWith('Unallocated overhead,,,')).toBe(true)
-      expect(l[3].startsWith('Total,,,')).toBe(true)
+      expect(l[0]).toBe(`Client,Project,${HEAD_REST}`)
+      expect(l[1].startsWith('Globex,Portal,2300.00')).toBe(true)
+      expect(l[2].startsWith('Unallocated overhead,,')).toBe(true)
+      expect(l[3].startsWith('Total,,')).toBe(true)
     })
 
     it('guards formula injection in client and project labels', () => {

@@ -21,24 +21,29 @@ export function csvField(value: string, opts: { text: boolean }): string {
   return /[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 
-function labelFor(row: PnlRow, params: PnlParams): string {
+function labelFor(row: PnlRow): string {
   if (row.kind === 'overhead') return 'Unallocated overhead'
   if (row.kind === 'total') return 'Total'
-  // Project grouping shows Client and Project as their own columns instead.
-  if (params.group === 'project') return ''
   return row.label
 }
 
 export function buildPnlCsv(rows: PnlRow[], params: PnlParams): { filename: string; body: string } {
   const cols = pnlBreakdownColumns(params)
-  const header = ['Group', ...(cols.client ? ['Client'] : []), ...(cols.project ? ['Project'] : []), ...MEASURE_HEADER]
+  // Project grouping has no separate Group column: Client and Project are the row labels,
+  // and the Total / Unallocated overhead labels go in the Client column.
+  const byProject = params.group === 'project'
+  const header = byProject
+    ? ['Client', 'Project', ...MEASURE_HEADER]
+    : ['Group', ...(cols.client ? ['Client'] : []), ...(cols.project ? ['Project'] : []), ...MEASURE_HEADER]
   const lines = [header.map((h) => csvField(h, { text: true })).join(',')]
   for (const r of rows) {
-    const labels = [
-      labelFor(r, params),
-      ...(cols.client ? [r.clientLabel ?? ''] : []),
-      ...(cols.project ? [r.projectLabel ?? ''] : []),
-    ]
+    const labels = byProject
+      ? [r.kind === 'group' ? (r.clientLabel ?? '') : labelFor(r), r.kind === 'group' ? (r.projectLabel ?? '') : '']
+      : [
+          labelFor(r),
+          ...(cols.client ? [r.clientLabel ?? ''] : []),
+          ...(cols.project ? [r.projectLabel ?? ''] : []),
+        ]
     const nums = [
       r.revenueHours,
       r.fees,
