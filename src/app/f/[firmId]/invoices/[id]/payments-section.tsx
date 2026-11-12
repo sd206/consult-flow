@@ -1,5 +1,8 @@
 'use client'
 
+import type { InvoiceDeposit } from '@/modules/bank/data'
+import { BankDeposits } from './bank-deposits'
+
 import { askConfirm } from '@/components/confirm-dialog'
 import { useState } from 'react'
 import { FileList } from '@/components/attachments/file-list'
@@ -55,6 +58,9 @@ type Props = {
   payments: PaymentRow[]
   /** Set when the payments could not be loaded; shown instead of an empty list. */
   paymentsError?: string | null
+  /** Imported bank deposits that could pay this invoice; null when unavailable. */
+  deposits: InvoiceDeposit[] | null
+  invoiceLabel: string
 }
 
 function MethodSelect({ id, defaultValue }: { id: string; defaultValue?: string }) {
@@ -327,6 +333,8 @@ export function PaymentsSection({
   balanceDue,
   payments,
   paymentsError,
+  deposits,
+  invoiceLabel,
 }: Props) {
   const editable = status !== 'void'
   const canRecord = status === 'issued' || status === 'partly_paid'
@@ -384,6 +392,9 @@ export function PaymentsSection({
         <p className="mt-4 text-sm text-muted-foreground">No payments recorded.</p>
       )}
 
+      {canRecord && deposits && (
+        <BankDeposits firmId={firmId} invoiceId={invoiceId} invoiceLabel={invoiceLabel} currency={currency} deposits={deposits} />
+      )}
       {canRecord && <RecordForm firmId={firmId} invoiceId={invoiceId} balanceDue={balanceDue} onWarning={setWarning} />}
       {warning && (
         <p role="status" className="mt-3 text-sm">

@@ -323,3 +323,18 @@ export async function resetLineAction(firmId: string, accountId: string, lineId:
   revalidate(firmId, accountId)
   return r
 }
+
+/** Records a payment on an invoice from an imported deposit (Payments section of the invoice page). */
+export async function recordFromDepositAction(
+  firmId: string,
+  invoiceId: string,
+  lineId: string,
+  notes: string,
+): Promise<Result<void>> {
+  const { db } = await requireFirmRole(firmId, [...MANAGERS])
+  if (!UUID.test(lineId) || !UUID.test(invoiceId)) return fail('Bank line not found.')
+  const r = await confirmPayment(db, lineId, invoiceId, notes.trim().slice(0, 1000) || null)
+  revalidatePath(`/f/${firmId}/invoices/${invoiceId}`)
+  revalidatePath(`/f/${firmId}/bank`, 'layout')
+  return r.ok ? { ok: true, data: undefined } : r
+}

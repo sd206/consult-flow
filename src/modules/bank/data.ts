@@ -263,3 +263,40 @@ export async function markDuplicates(
   const row = (data as { matched: number; ignored: number; skipped: number }[] | null)?.[0]
   return row ? ok(row) : fail(mapDbError(null))
 }
+
+export type InvoiceDeposit = {
+  lineId: string
+  postedOn: string
+  amount: string
+  description: string
+  accountName: string
+  accountKind: 'bank' | 'credit_card'
+  exactMatch: boolean
+}
+
+type InvoiceDepositDb = {
+  line_id: string
+  posted_on: string
+  amount: string
+  description: string
+  account_name: string
+  account_kind: 'bank' | 'credit_card'
+  exact_match: boolean
+}
+
+/** New imported deposits that could pay this invoice (see invoice_bank_deposits). */
+export async function listInvoiceDeposits(db: SupabaseClient, invoiceId: string): Promise<Result<InvoiceDeposit[]>> {
+  const { data, error } = await db.rpc('invoice_bank_deposits', { p_invoice: invoiceId })
+  if (error) return fail(mapDbError(error))
+  return ok(
+    ((data ?? []) as InvoiceDepositDb[]).map((r) => ({
+      lineId: r.line_id,
+      postedOn: r.posted_on,
+      amount: r.amount,
+      description: r.description,
+      accountName: r.account_name,
+      accountKind: r.account_kind,
+      exactMatch: r.exact_match,
+    })),
+  )
+}

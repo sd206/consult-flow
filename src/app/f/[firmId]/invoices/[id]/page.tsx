@@ -4,6 +4,7 @@ import { requireFirmRole } from '@/lib/auth/context'
 import { formatMoney } from '@/lib/domain/money'
 import { listTemplates } from '@/modules/invoice-templates/data'
 import { getInvoice, listCandidates } from '@/modules/invoices/data'
+import { listInvoiceDeposits } from '@/modules/bank/data'
 import { listPayments } from '@/modules/payments/data'
 import { INVOICE_STATUS_LABEL } from '../status-label'
 import { DraftEditor, type ConsultantOption } from './draft-editor'
@@ -61,7 +62,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ firmId
     )
   }
 
-  const paymentsRes = await listPayments(db, firmId, id)
+  const canRecord = inv.status === 'issued' || inv.status === 'partly_paid'
+  const [paymentsRes, depositsRes] = await Promise.all([
+    listPayments(db, firmId, id),
+    canRecord ? listInvoiceDeposits(db, id) : null,
+  ])
   const m = (v: string) => formatMoney(v, inv.currency)
   const cell = 'flex flex-col gap-0.5 text-sm'
   return (
@@ -163,6 +168,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ firmId
         balanceDue={inv.balanceDue}
         payments={paymentsRes.ok ? paymentsRes.data : []}
         paymentsError={paymentsRes.ok ? null : paymentsRes.error}
+        deposits={depositsRes && depositsRes.ok ? depositsRes.data : null}
+        invoiceLabel={inv.number ?? 'this invoice'}
       />
 
       <IssuedActions firmId={firmId} invoiceId={inv.id} status={inv.status} hasPdf={!!inv.pdfPath} />
