@@ -227,7 +227,7 @@ export function ReviewList({
                 clients={clients}
                 projects={projects}
                 currency={currency}
-                onDone={() => setOpen(null)}
+                onDone={() => setOpen((o) => (o === l.id ? null : o))}
               />
             </td>
           </tr>

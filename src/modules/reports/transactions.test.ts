@@ -32,6 +32,26 @@ const expense = {
 }
 
 describe('transactions', () => {
+  it('treats other income as money in', () => {
+    const income = {
+      ...payment,
+      kind: 'other_income' as const,
+      id: 'o1',
+      client_name: null,
+      invoice_number: null,
+      method: null,
+      reference: null,
+      payee: 'First Bank',
+      category: 'Interest',
+      amount: '3.21',
+      notes: null,
+    }
+    expect(toTxnRow(income)).toMatchObject({ transaction: 'Other income – First Bank', category: 'Interest', amount: '3.21', notes: '' })
+    expect(txnTotals([toTxnRow(income), toTxnRow(expense)])).toEqual({ moneyIn: '3.21', moneyOut: '-180.10', net: '-176.89', count: 2 })
+    const { body } = buildTxnCsv([toTxnRow({ ...income, payee: '@SUM(1)' })], txnTotals([]), { from: '2026-01-01', to: '2026-01-31', kind: 'in' })
+    expect(body).toContain("Other income – @SUM(1)")
+  })
+
   it('describes and signs payments and expenses', () => {
     expect(toTxnRow(payment)).toMatchObject({
       date: '2026-03-05',

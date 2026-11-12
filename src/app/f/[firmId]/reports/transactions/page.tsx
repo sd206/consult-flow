@@ -44,7 +44,7 @@ export default async function TransactionsPage({
     <div className="max-w-6xl">
       <h1 className="text-2xl font-semibold">Transactions</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Payments received and expenses, for your accountant. Download the CSV to share it.
+        Payments received, other income and expenses, for your accountant. Download the CSV to share it.
       </p>
 
       <form method="get" aria-label="Filter transactions" className="mt-4 flex flex-wrap items-end gap-3 text-sm">
@@ -60,7 +60,7 @@ export default async function TransactionsPage({
           <label htmlFor="t-kind">Type</label>
           <select id="t-kind" name="kind" defaultValue={kind} className={field}>
             <option value="all">All</option>
-            <option value="in">Money in (payments)</option>
+            <option value="in">Money in (payments and other income)</option>
             <option value="out">Money out (expenses)</option>
           </select>
         </div>

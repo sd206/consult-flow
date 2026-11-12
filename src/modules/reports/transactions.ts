@@ -7,13 +7,15 @@ export type TxnKind = 'all' | 'in' | 'out'
 
 export type TxnParams = { from: string; to: string; kind: TxnKind }
 
+export type TxnKindDb = 'payment' | 'expense' | 'other_income'
+
 export type TxnRow = {
-  kind: 'payment' | 'expense'
+  kind: TxnKindDb
   id: string
   date: string
   transaction: string
   category: string
-  /** Signed: payments positive, expenses negative, two decimals. */
+  /** Signed: payments and other income positive, expenses negative, two decimals. */
   amount: string
   notes: string
 }
@@ -52,7 +54,7 @@ export function parseTxnParams(search: Search, today: string): Result<TxnParams>
 }
 
 type TxnDb = {
-  kind: 'payment' | 'expense'
+  kind: TxnKindDb
   id: string
   txn_date: string
   client_name: string | null
@@ -87,6 +89,7 @@ export function describeTxn(r: TxnDb): string {
     const inv = r.invoice_number ? `, ${r.invoice_number}` : ''
     return `Payment – ${r.client_name ?? ''}${inv}${extra ? ` (${extra})` : ''}`
   }
+  if (r.kind === 'other_income') return `Other income – ${r.payee ?? ''}`
   const work = [r.client_name, r.project_name].filter(Boolean).join(' / ')
   return `Expense – ${r.payee ?? ''}${work ? ` (${work})` : ''}`
 }
@@ -109,8 +112,8 @@ export function txnTotals(rows: TxnRow[]): TxnTotals {
   let moneyOut = 0
   for (const r of rows) {
     const c = toCents(r.amount)
-    if (r.kind === 'payment') moneyIn += c
-    else moneyOut += c
+    if (r.kind === 'expense') moneyOut += c
+    else moneyIn += c
   }
   return { moneyIn: fromCents(moneyIn), moneyOut: fromCents(moneyOut), net: fromCents(moneyIn + moneyOut), count: rows.length }
 }

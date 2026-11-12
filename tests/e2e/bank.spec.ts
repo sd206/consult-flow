@@ -111,3 +111,35 @@ test('a consultant cannot open bank accounts', async ({ page }) => {
   const res = await page.goto(`/f/${f.firmId}/bank`)
   expect(res?.status()).toBe(404)
 })
+
+test('a deposit recorded as other income shows on the Transactions report', async ({ page }) => {
+  const f = await newFirm('Bank Income Firm')
+  await login(page, f.manager.email)
+  await addAccount(page, f.firmId, 'Savings', 'Bank')
+
+  await upload(page, 'inout.csv')
+  const mapping = page.getByRole('form', { name: 'CSV columns' })
+  await mapping.getByLabel('Date format').selectOption('DMY')
+  await expect(mapping.getByLabel('Amounts')).toHaveValue('inout')
+  await mapping.getByRole('button', { name: 'Import with these columns' }).click()
+  await expect(page.getByRole('status')).toContainText('2 new lines, 0 already imported')
+  await expect(page.getByRole('status')).toContainText("Row 5: The date doesn't match the chosen format.")
+
+  await page.getByRole('button', { name: /^Review Interest paid/ }).click()
+  await page.getByRole('radio', { name: 'Other income' }).check()
+  const form = page.getByRole('form', { name: 'Other income' })
+  await expect(form.getByLabel('Received from')).toHaveValue('Interest paid')
+  await form.getByLabel('Category').selectOption({ label: 'Interest' })
+  await form.getByLabel('Notes (optional)').fill('November interest')
+  await form.getByRole('button', { name: 'Confirm other income' }).click()
+  await expect(page.getByRole('button', { name: /^Review Interest paid/ })).toHaveCount(0)
+
+  await goTo(page, 'Billing', 'Other income')
+  await expect(page.getByRole('row', { name: /Interest paid/ })).toContainText('$1,234.50')
+
+  await goTo(page, 'Reports', 'Transactions')
+  const txn = page.getByRole('row', { name: /Other income – Interest paid/ })
+  await expect(txn).toContainText('Interest')
+  await expect(txn).toContainText('$1,234.50')
+  await expect(txn).toContainText('November interest')
+})
