@@ -153,7 +153,10 @@ describe('core tenancy RLS', () => {
     expect(ids).toHaveLength(2)
     expect(ids).toContain(a.firmId)
     expect(ids).toContain(b.firmId)
-    const { data: firms } = await owner.db.from('firms').select('id')
+    // Platform ownership grants no row access: the owner can't read firms it isn't a member of.
+    // (Checked by id, since the local demo seed makes the owner a member of its demo firm.)
+    const { data: firms, error: firmsError } = await owner.db.from('firms').select('id').in('id', [a.firmId, b.firmId])
+    expect(firmsError).toBeNull()
     expect(firms).toHaveLength(0)
     const { data: adminList } = await a.admin.db.rpc('platform_list_firms')
     expect(adminList).toHaveLength(0)
