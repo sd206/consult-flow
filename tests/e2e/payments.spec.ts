@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { goTo } from './nav'
 import { test, expect, type Page } from '@playwright/test'
+import { answerConfirm } from './confirm'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 import { todayIso } from '../../src/lib/domain/dates'
 import { addDays } from '../../src/lib/domain/weeks'
@@ -108,12 +109,8 @@ test('edit and delete a payment', async ({ page }) => {
   await edit.getByRole('button', { name: 'Save' }).click()
   await expect(page.getByRole('row', { name: /TRX-882/ })).toBeVisible()
 
-  let message = ''
-  page.once('dialog', (d) => {
-    message = d.message()
-    void d.accept()
-  })
   await page.getByRole('row', { name: /TRX-882/ }).getByRole('button', { name: 'Delete' }).click()
+  const message = await answerConfirm(page)
   await expect(page.getByRole('row', { name: /TRX-882/ })).toHaveCount(0)
   expect(message).toBe('Delete this payment of $500.00? Its files are deleted too.')
   await expect(page.getByTestId('balance-due')).toHaveText('$788.88')
@@ -126,12 +123,8 @@ test('remove an attached file while editing', async ({ page }) => {
   const row = page.getByRole('row', { name: /TRX-RM/ })
   await expect(row.getByRole('link', { name: 'remittance.pdf' })).toBeVisible()
   await row.getByRole('button', { name: 'Edit' }).click()
-  let message = ''
-  page.once('dialog', (d) => {
-    message = d.message()
-    void d.accept()
-  })
   await page.getByRole('form', { name: 'Edit payment' }).getByRole('button', { name: 'Remove remittance.pdf' }).click()
+  const message = await answerConfirm(page)
   await expect(page.getByRole('link', { name: 'remittance.pdf' })).toHaveCount(0)
   expect(message).toBe("Remove remittance.pdf? This can't be undone.")
 })

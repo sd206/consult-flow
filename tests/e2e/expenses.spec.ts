@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { goTo } from './nav'
 import { test, expect, type Page } from '@playwright/test'
+import { answerConfirm } from './confirm'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 
 const REMITTANCE = path.join(__dirname, 'fixtures', 'remittance.pdf')
@@ -127,12 +128,8 @@ test('delete an expense', async ({ page }) => {
   const { f } = await setup('Exp Delete Firm')
   await openNew(page, f)
   await fillExpense(page, { payee: 'Gone Co', amount: '65.43' })
-  let message = ''
-  page.once('dialog', (d) => {
-    message = d.message()
-    void d.accept()
-  })
   await page.getByRole('button', { name: 'Delete expense' }).click()
+  const message = await answerConfirm(page)
   await expect(page).toHaveURL(/\/expenses(\?|$)/)
   expect(message).toBe('Delete this expense of $65.43? Its receipts are deleted too.')
   await expect(page.getByRole('row', { name: /Gone Co/ })).toHaveCount(0)

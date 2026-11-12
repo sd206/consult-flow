@@ -1,5 +1,6 @@
 'use client'
 
+import { askConfirm } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -236,8 +237,8 @@ export function DraftEditor({
         <Button
           type="button"
           disabled={pending}
-          onClick={() => {
-            if (window.confirm(issueConfirmText(invoice.issueDate, invoice.dueDate))) {
+          onClick={async () => {
+            if (await askConfirm(issueConfirmText(invoice.issueDate, invoice.dueDate), { confirmLabel: 'Issue invoice' })) {
               run(() => issueInvoiceAction(firmId, invoice.id))
             }
           }}
@@ -248,8 +249,8 @@ export function DraftEditor({
           type="button"
           variant="destructive"
           disabled={pending}
-          onClick={() => {
-            if (window.confirm('Delete this draft? This cannot be undone.')) {
+          onClick={async () => {
+            if (await askConfirm('Delete this draft? This cannot be undone.', { confirmLabel: 'Delete', destructive: true })) {
               run(
                 () => deleteDraftAction(firmId, invoice.id),
                 () => router.push(`/f/${firmId}/invoices`),

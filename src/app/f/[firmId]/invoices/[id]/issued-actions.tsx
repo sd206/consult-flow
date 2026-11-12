@@ -1,5 +1,6 @@
 'use client'
 
+import { askConfirm } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { regeneratePdfAction, voidInvoiceAction } from '@/modules/invoices/actions'
 import { useRun } from '@/components/use-run'
@@ -40,9 +41,12 @@ export function IssuedActions({
             type="button"
             variant="destructive"
             disabled={pending}
-            onClick={() => {
+            onClick={async () => {
               if (
-                window.confirm("Void this invoice? Its hours become available to invoice again. The number won't be reused.")
+                await askConfirm("Void this invoice? Its hours become available to invoice again. The number won't be reused.", {
+                  confirmLabel: 'Void invoice',
+                  destructive: true,
+                })
               ) {
                 run(() => voidInvoiceAction(firmId, invoiceId))
               }

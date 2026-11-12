@@ -1,5 +1,6 @@
 'use client'
 
+import { askConfirm } from '@/components/confirm-dialog'
 import { useRouter } from 'next/navigation'
 import { useRef, useState, useTransition } from 'react'
 import { FileList } from '@/components/attachments/file-list'
@@ -370,8 +371,8 @@ export function DeleteExpenseButton({
         type="button"
         variant="destructive"
         disabled={pending}
-        onClick={() => {
-          if (!window.confirm(`Delete this expense of ${formatMoney(amount, currency)}? Its receipts are deleted too.`)) return
+        onClick={async () => {
+          if (!(await askConfirm(`Delete this expense of ${formatMoney(amount, currency)}? Its receipts are deleted too.`, { confirmLabel: 'Delete', destructive: true }))) return
           setError(null)
           startTransition(async () => {
             try {

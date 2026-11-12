@@ -1,5 +1,6 @@
 'use client'
 
+import { askConfirm } from '@/components/confirm-dialog'
 import { useState } from 'react'
 import { FileList } from '@/components/attachments/file-list'
 import { FILE_ACCEPT, takeFiles, uploadFiles } from '@/components/attachments/upload-files'
@@ -289,8 +290,8 @@ function PaymentRowView({
                 variant="destructive"
                 size="sm"
                 disabled={pending}
-                onClick={() => {
-                  if (window.confirm(`Delete this payment of ${m}? Its files are deleted too.`)) {
+                onClick={async () => {
+                  if (await askConfirm(`Delete this payment of ${m}? Its files are deleted too.`, { confirmLabel: 'Delete', destructive: true })) {
                     run(() => deletePaymentAction(firmId, invoiceId, p.id))
                   }
                 }}

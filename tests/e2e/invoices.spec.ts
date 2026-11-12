@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { answerConfirm } from './confirm'
 import { goTo } from './nav'
 import { adminDb, newFirm, TEST_PASSWORD } from '../integration/helpers'
 import { seedApprovedHours } from '../integration/invoice-fixtures'
@@ -51,12 +52,8 @@ async function buildDraft(page: Page, f: Firm) {
 const ISSUE_TAIL = "It gets the next number and can't be edited afterwards."
 
 async function issue(page: Page) {
-  let message = ''
-  page.once('dialog', (d) => {
-    message = d.message()
-    void d.accept()
-  })
   await page.getByRole('button', { name: 'Issue invoice' }).click()
+  const message = await answerConfirm(page)
   await expect(page.getByTestId('status')).toHaveText('Issued')
   // Drafts are dated today, so no past-date warning.
   expect(message).toMatch(/^Issue this invoice dated \d{1,2} [A-Z][a-z]{2} \d{4} and due \d{1,2} [A-Z][a-z]{2} \d{4}\? /)
@@ -110,8 +107,8 @@ test('void returns hours', async ({ page }) => {
   const f = await seed('Invoice Void Firm')
   await buildDraft(page, f)
   await issue(page)
-  page.once('dialog', (d) => d.accept())
   await page.getByRole('button', { name: 'Void invoice' }).click()
+  await answerConfirm(page)
   await expect(page.getByTestId('status')).toHaveText('Void')
   await expect(page.getByText('This invoice is void.')).toBeVisible()
   await expect(page.getByRole('link', { name: 'Download original PDF' })).toBeVisible()
@@ -163,13 +160,9 @@ test('issuing warns about an issue date in the past', async ({ page }) => {
   await page.reload()
   await expect(page.getByLabel('Issue date')).toHaveValue('2026-01-05')
 
-  let message = ''
-  page.once('dialog', (d) => {
-    message = d.message()
-    void d.dismiss()
-  })
   await page.getByRole('button', { name: 'Issue invoice' }).click()
-  await expect.poll(() => message).toBe(`The issue date is in the past. Issue this invoice dated 5 Jan 2026 and due 4 Feb 2026? ${ISSUE_TAIL}`)
+  const message = await answerConfirm(page, false)
+  expect(message).toBe(`The issue date is in the past. Issue this invoice dated 5 Jan 2026 and due 4 Feb 2026? ${ISSUE_TAIL}`)
   await expect(page.getByRole('heading', { name: 'Draft invoice' })).toBeVisible()
 })
 

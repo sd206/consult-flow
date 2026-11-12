@@ -1,5 +1,6 @@
 'use client'
 
+import { askConfirm } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import type { FormResult } from '@/lib/form'
 import { useRun } from '@/components/use-run'
@@ -38,8 +39,8 @@ export function FileList({
             size="sm"
             disabled={pending}
             aria-label={`Remove ${a.fileName}`}
-            onClick={() => {
-              if (window.confirm(`Remove ${a.fileName}? This can't be undone.`)) {
+            onClick={async () => {
+              if (await askConfirm(`Remove ${a.fileName}? This can't be undone.`, { confirmLabel: 'Remove', destructive: true })) {
                 run(() => onRemove(a.id))
               }
             }}

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
+import { answerConfirm } from './confirm'
 import { newFirm, TEST_PASSWORD } from '../integration/helpers'
 
 async function login(page: Page, email: string) {
@@ -43,8 +44,8 @@ test('admin manages invoice templates', async ({ page }) => {
 
   await row(page, 'Standard').getByRole('button', { name: 'Make default' }).click()
   await expect(row(page, 'Standard')).toContainText('Default')
-  page.once('dialog', (d) => d.accept())
   await row(page, 'Modern blue').getByRole('button', { name: 'Delete' }).click()
+  await answerConfirm(page)
   await expect(page.getByText('Modern blue')).toHaveCount(0)
 })
 

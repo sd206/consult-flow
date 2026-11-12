@@ -1,5 +1,6 @@
 'use client'
 
+import { askConfirm } from '@/components/confirm-dialog'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -111,8 +112,8 @@ export function CategoryRow({ firmId, category: c }: { firmId: string; category:
               variant="destructive"
               size="sm"
               disabled={pending}
-              onClick={() => {
-                if (window.confirm(`Delete the category ${c.name}? This can't be undone.`)) {
+              onClick={async () => {
+                if (await askConfirm(`Delete the category ${c.name}? This can't be undone.`, { confirmLabel: 'Delete', destructive: true })) {
                   run(() => deleteCategoryAction(firmId, c.id))
                 }
               }}

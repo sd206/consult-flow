@@ -1,5 +1,6 @@
 'use client'
 
+import { askConfirm } from '@/components/confirm-dialog'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
@@ -183,8 +184,8 @@ export function TemplateRowActions({ firmId, id, isDefault }: { firmId: string; 
         size="sm"
         variant="outline"
         disabled={pending}
-        onClick={() => {
-          if (window.confirm('Delete this template? This cannot be undone.')) run(() => deleteTemplateAction(firmId, id))
+        onClick={async () => {
+          if (await askConfirm('Delete this template? This cannot be undone.', { confirmLabel: 'Delete', destructive: true })) run(() => deleteTemplateAction(firmId, id))
         }}
       >
         Delete
