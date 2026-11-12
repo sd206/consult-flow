@@ -35,7 +35,8 @@ import {
 } from './schemas'
 
 const MANAGERS = ['admin', 'manager'] as const
-const MAX_BYTES = 5 * 1024 * 1024
+// Vercel caps a request body at 4.5 MB; keep statements safely under it.
+const MAX_BYTES = 4 * 1024 * 1024
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 function revalidate(firmId: string, accountId?: string) {
@@ -76,7 +77,7 @@ export async function setAccountActiveAction(firmId: string, accountId: string, 
 async function readUpload(formData: FormData): Promise<Result<{ name: string; text: string }>> {
   const file = formData.get('file')
   if (!(file instanceof File) || file.size === 0) return fail('Choose a statement file.')
-  if (file.size > MAX_BYTES) return fail('This file is larger than 5 MB.')
+  if (file.size > MAX_BYTES) return fail('This file is larger than 4 MB. Split the statement into shorter date ranges.')
   if (!statementFormat(file.name)) return fail('Upload an OFX, QFX or CSV file.')
   return { ok: true, data: { name: file.name, text: await file.text() } }
 }

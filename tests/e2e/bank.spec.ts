@@ -144,17 +144,30 @@ test('a deposit recorded as other income shows on the Transactions report', asyn
   await expect(txn).toContainText('November interest')
 })
 
-test('a statement between 3 MB and 5 MB uploads', async ({ page }) => {
-  const f = await newFirm('Bank Big File Firm')
-  await login(page, f.manager.email)
-  await addAccount(page, f.firmId, 'Busy checking', 'Bank')
-  const memo = 'M'.repeat(4000)
+function bigOfx(memoLength: number): string {
+  const memo = 'M'.repeat(memoLength)
   const txns = Array.from(
     { length: 1000 },
     (_, i) => `<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261102<TRNAMT>-1.00<FITID>BIG${i}<NAME>VENDOR ${i}<MEMO>${memo}</STMTTRN>`,
   ).join('\n')
-  const body = `OFXHEADER:100\nDATA:OFXSGML\n\n<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>\n${txns}\n</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>\n`
+  return `OFXHEADER:100\nDATA:OFXSGML\n\n<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>\n${txns}\n</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>\n`
+}
+
+// Vercel caps a request at 4.5 MB, so statements are limited to 4 MB.
+test('a statement just under 4 MB uploads; a larger one is refused with a clear message', async ({ page }) => {
+  const f = await newFirm('Bank Big File Firm')
+  await login(page, f.manager.email)
+  await addAccount(page, f.firmId, 'Busy checking', 'Bank')
+
+  const tooBig = bigOfx(4300)
+  expect(tooBig.length).toBeGreaterThan(4 * 1024 * 1024)
+  await page.getByLabel('Statement file').setInputFiles({ name: 'too-big.qfx', mimeType: 'application/x-ofx', buffer: Buffer.from(tooBig) })
+  await page.getByRole('button', { name: 'Upload', exact: true }).click()
+  await expect(page.getByRole('alert').filter({ hasText: 'larger than' })).toHaveText('This file is larger than 4 MB. Split the statement into shorter date ranges.')
+
+  const body = bigOfx(4000)
   expect(body.length).toBeGreaterThan(3.5 * 1024 * 1024)
+  expect(body.length).toBeLessThan(4 * 1024 * 1024)
   await page.getByLabel('Statement file').setInputFiles({ name: 'big.qfx', mimeType: 'application/x-ofx', buffer: Buffer.from(body) })
   await page.getByRole('button', { name: 'Upload', exact: true }).click()
   await expect(page.getByRole('status')).toContainText('1000 new lines, 0 already imported', { timeout: 30000 })

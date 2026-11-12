@@ -26,8 +26,8 @@ export function UploadForm({ firmId, accountId, hasMapping }: { firmId: string; 
       setError('Choose a statement file.')
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('This file is larger than 5 MB.')
+    if (file.size > 4 * 1024 * 1024) {
+      setError('This file is larger than 4 MB. Split the statement into shorter date ranges.')
       return
     }
     const fd = new FormData()
@@ -63,7 +63,7 @@ export function UploadForm({ firmId, accountId, hasMapping }: { firmId: string; 
         Upload a statement
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Download transactions from your bank as OFX, QFX or CSV. Lines already imported are skipped automatically.
+        Download transactions from your bank as OFX, QFX or CSV (up to 4 MB). Lines already imported are skipped automatically.
       </p>
       <form
         aria-label="Upload statement"

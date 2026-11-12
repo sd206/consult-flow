@@ -65,7 +65,7 @@ hand on its own page.
 ## Reading files
 
 Parsing happens on the server in TypeScript, in `src/modules/bank/`. Limits:
-5 MB per file, 5,000 lines per file.
+4 MB per file (Vercel caps a request at 4.5 MB), 5,000 lines per file.
 
 **OFX/QFX**: both the older SGML style and the XML style. Read each
 `STMTTRN` block: DTPOSTED (date), TRNAMT (signed amount), FITID (bank_ref),
