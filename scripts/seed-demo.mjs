@@ -4,6 +4,7 @@
 // Local only — never point this at a hosted project.
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
+import { seedDemoBank } from './seed-demo-bank.mjs'
 
 const env = Object.fromEntries(
   readFileSync(new URL('../.env.local', import.meta.url), 'utf8')
@@ -207,6 +208,9 @@ must(
   ]),
   'expenses',
 )
+
+// ---------------------------------------------------------------- bank statements
+await seedDemoBank(maya, firmId)
 
 console.log(`Demo Consulting ready (firm ${firmId}).`)
 console.log(`Invoices issued: ${i1.number} (paid), plus an overdue one and a part-paid one; one draft.`)
