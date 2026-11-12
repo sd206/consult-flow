@@ -707,11 +707,68 @@ isOneToOne: false
 "approve_timesheet":
 { Args: { "p_timesheet": string }; Returns: undefined
                            },
+"bank_account_checked":
+{ Args: { "p_account": string }; Returns: {
+              "active": boolean,
+"created_at": string,
+"created_by": string | null,
+"csv_mapping": Json | null,
+"firm_id": string,
+"id": string,
+"kind": Database["public"]['Enums']["bank_account_kind"],
+"last4": string | null,
+"name": string,
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "bank_accounts"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"bank_lock_line":
+{ Args: { "p_line": string,"p_statuses": (Database["public"]['Enums']["bank_line_status"])[] }; Returns: {
+              "account_id": string,
+"amount": number,
+"bank_ref": string | null,
+"clean_description": string,
+"created_at": string,
+"dedupe_key": string,
+"description": string,
+"expense_id": string | null,
+"firm_id": string,
+"id": string,
+"ignore_reason": string | null,
+"import_id": string | null,
+"other_income_id": string | null,
+"payment_id": string | null,
+"posted_on": string,
+"status": Database["public"]['Enums']["bank_line_status"],
+"updated_at": string
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "bank_lines"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"bank_match_candidates":
+{ Args: { "p_line": string }; Returns: Json
+                           },
 "can_edit_consultant_time":
 { Args: { "p_consultant": string,"p_firm": string }; Returns: boolean
                            },
 "change_client_rate":
 { Args: { "p_assignment": string,"p_from": string,"p_rate": number }; Returns: string
+                           },
+"confirm_bank_line_expense":
+{ Args: { "p_category": string,"p_client": string,"p_line": string,"p_notes": string,"p_payee": string,"p_project": string }; Returns: string
+                           },
+"confirm_bank_line_other_income":
+{ Args: { "p_category": string,"p_line": string,"p_notes": string,"p_source": string }; Returns: string
+                           },
+"confirm_bank_line_payment":
+{ Args: { "p_invoice": string,"p_line": string,"p_notes": string }; Returns: string
                            },
 "create_firm_with_admin":
 { Args: { "p_admin": string,"p_name": string }; Returns: string
@@ -741,6 +798,14 @@ isOneToOne: false
                            },
 "has_role":
 { Args: { "p_firm": string,"p_roles": (Database["public"]['Enums']["firm_role"])[] }; Returns: boolean
+                           },
+"ignore_bank_lines":
+{ Args: { "p_lines": (string)[],"p_reason": string }; Returns: number
+                           },
+"import_bank_lines":
+{ Args: { "p_account": string,"p_file_name": string,"p_format": string,"p_lines": Json }; Returns: {
+              "duplicates": number,"import_id": string,"inserted": number
+            }[]
                            },
 "invoice_apply_payments":
 { Args: { "p_invoice": string }; Returns: undefined
@@ -820,6 +885,14 @@ isOneToOne: false
 "issue_invoice":
 { Args: { "p_invoice": string }; Returns: string
                            },
+"link_bank_line":
+{ Args: { "p_expense": string,"p_line": string,"p_payment": string }; Returns: undefined
+                           },
+"list_bank_lines":
+{ Args: { "p_account": string,"p_status": string }; Returns: {
+              "amount": string,"bank_ref": string,"description": string,"expense_id": string,"id": string,"ignore_reason": string,"linked_label": string,"other_income_id": string,"payment_id": string,"posted_on": string,"status": string,"suggested_category_id": string
+            }[]
+                           },
 "list_expenses":
 { Args: { "p_category": string,"p_client": string,"p_firm": string,"p_from": string,"p_limit": number,"p_missing_receipt": boolean,"p_offset": number,"p_project": string,"p_to": string }; Returns: {
               "amount": string,"category_id": string,"category_name": string,"client_id": string,"client_name": string,"id": string,"payee": string,"project_id": string,"project_name": string,"receipt_count": number,"spent_on": string
@@ -896,6 +969,12 @@ isOneToOne: false
                            },
 "reopen_timesheet":
 { Args: { "p_timesheet": string }; Returns: undefined
+                           },
+"reset_bank_line":
+{ Args: { "p_line": string }; Returns: undefined
+                           },
+"save_csv_mapping":
+{ Args: { "p_account": string,"p_mapping": Json }; Returns: undefined
                            },
 "save_manual_line":
 { Args: { "p_description": string,"p_invoice": string,"p_line": string,"p_quantity": number,"p_unit_price": number }; Returns: string
