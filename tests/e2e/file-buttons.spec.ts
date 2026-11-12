@@ -39,11 +39,19 @@ test('the file picker button is teal on every page that has one', async ({ page 
     .single()
   expect(eErr).toBeNull()
 
+  const { data: acct, error: aErr } = await adminDb()
+    .from('bank_accounts')
+    .insert({ firm_id: f.firmId, name: 'Main checking', kind: 'bank' })
+    .select('id')
+    .single()
+  expect(aErr).toBeNull()
+
   await login(page, f.admin.email)
   const pages: [string, string][] = [
     [`/f/${f.firmId}/expenses/new`, '#exp-files'],
     [`/f/${f.firmId}/expenses/${exp!.id}`, '#add-files'],
-    [`/f/${f.firmId}/invoices/${inv.invoiceId}`, 'input[type=file]'],
+    [`/f/${f.firmId}/payments/record?invoice=${inv.invoiceId}`, '#rec-files'],
+    [`/f/${f.firmId}/bank/${acct!.id}`, '#stmt-file'],
     [`/f/${f.firmId}/settings`, '#logo-file'],
   ]
   for (const [url, sel] of pages) {
