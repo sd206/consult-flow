@@ -253,3 +253,13 @@ export async function resetLine(db: SupabaseClient, lineId: string): Promise<Res
   const { error } = await db.rpc('reset_bank_line', { p_line: lineId })
   return error ? fail(mapDbError(error)) : ok(undefined)
 }
+
+export async function markDuplicates(
+  db: SupabaseClient,
+  lineIds: string[],
+): Promise<Result<{ matched: number; ignored: number; skipped: number }>> {
+  const { data, error } = await db.rpc('mark_bank_lines_duplicate', { p_lines: lineIds })
+  if (error) return fail(mapDbError(error))
+  const row = (data as { matched: number; ignored: number; skipped: number }[] | null)?.[0]
+  return row ? ok(row) : fail(mapDbError(null))
+}
