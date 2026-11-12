@@ -30,10 +30,18 @@ async function open(page: Page, f: Awaited<ReturnType<typeof newFirm>>, invoiceI
 }
 
 const form = (page: Page) => page.getByRole('form', { name: 'Record payment' })
+const recordLink = (page: Page) => page.getByRole('link', { name: 'Record payment', exact: true })
+
+/** From the invoice page, opens the Record payment screen for that invoice. */
+async function openRecord(page: Page) {
+  await recordLink(page).click()
+  await expect(page.getByRole('heading', { name: 'Record payment' })).toBeVisible()
+}
 
 type FileArg = string | { name: string; mimeType: string; buffer: Buffer }
 
 async function record(page: Page, amount: string, extra: { reference?: string; file?: FileArg } = {}) {
+  if (!(await form(page).isVisible())) await openRecord(page)
   const fm = form(page)
   await fm.getByLabel('Amount').fill(amount)
   await fm.getByLabel('Method').selectOption({ label: 'Bank transfer' })
@@ -46,6 +54,8 @@ test('partial payment with a file, then pay the rest', async ({ page }) => {
   const { f, invoiceId } = await setup('Pay Partial Firm')
   await open(page, f, invoiceId)
   await expect(page.getByTestId('balance-due')).toHaveText('$1,234.56')
+  await openRecord(page)
+  await expect(page).toHaveURL(new RegExp(`/payments/record\\?invoice=${invoiceId}`))
   await expect(form(page).getByLabel('Amount')).toHaveValue('1234.56')
 
   await record(page, '500.00', { reference: 'TRX-881', file: REMITTANCE })
@@ -60,10 +70,11 @@ test('partial payment with a file, then pay the rest', async ({ page }) => {
   expect(res.status()).toBe(200)
   expect(res.headers()['content-type']).toContain('application/pdf')
 
+  await openRecord(page)
   await expect(form(page).getByLabel('Amount')).toHaveValue('734.56')
   await record(page, '734.56')
   await expect(page.getByTestId('status')).toHaveText('Paid')
-  await expect(form(page)).toHaveCount(0)
+  await expect(recordLink(page)).toHaveCount(0)
 })
 
 test('overpayment is refused', async ({ page }) => {
@@ -71,15 +82,16 @@ test('overpayment is refused', async ({ page }) => {
   await open(page, f, invoiceId)
   await record(page, '2000')
   await expect(page.getByText('This payment is more than the balance due.')).toBeVisible()
-  await expect(page.getByTestId('status')).toHaveText('Issued')
+  await expect(page.getByTestId('record-balance-due')).toHaveText('$777.77')
 })
 
 test('a disguised file is rejected with a warning but the payment is recorded', async ({ page }) => {
   const { f, invoiceId } = await setup('Pay Fake Firm', '555.55')
   await open(page, f, invoiceId)
   await record(page, '100.00', { reference: 'TRX-FAKE', file: FAKE })
-  await expect(page.getByTestId('status')).toHaveText('Partly paid')
   await expect(page.getByRole('status').filter({ hasText: 'fake.pdf' })).toBeVisible()
+  await page.getByRole('link', { name: 'Continue' }).click()
+  await expect(page.getByTestId('status')).toHaveText('Partly paid')
   await expect(page.getByRole('row', { name: /TRX-FAKE/ })).toBeVisible()
   await expect(page.getByRole('link', { name: 'fake.pdf' })).toHaveCount(0)
 })
@@ -88,9 +100,10 @@ test('the file warning survives a payment that completes the invoice', async ({ 
   const { f, invoiceId } = await setup('Pay Full Fake Firm', '666.66')
   await open(page, f, invoiceId)
   await record(page, '666.66', { reference: 'TRX-FULL', file: FAKE })
-  await expect(page.getByTestId('status')).toHaveText('Paid')
-  await expect(form(page)).toHaveCount(0)
   await expect(page.getByRole('status').filter({ hasText: 'fake.pdf' })).toBeVisible()
+  await page.getByRole('link', { name: 'Continue' }).click()
+  await expect(page.getByTestId('status')).toHaveText('Paid')
+  await expect(recordLink(page)).toHaveCount(0)
   await expect(page.getByRole('row', { name: /TRX-FULL/ })).toBeVisible()
   await expect(page.getByRole('link', { name: 'fake.pdf' })).toHaveCount(0)
 })
@@ -238,4 +251,44 @@ test('a consultant gets a 404 on the payments page', async ({ page }) => {
   await login(page, f.consultant.email)
   const res = await page.goto(`/f/${f.firmId}/payments`)
   expect(res?.status()).toBe(404)
+})
+
+test('record from the Payments page and filter unreconciled payments', async ({ page }) => {
+  const { f, invoiceId } = await setup('Pay Reconcile Firm', '900.00')
+  await login(page, f.manager.email)
+  await goTo(page, 'Billing', 'Payments')
+  await page.getByRole('link', { name: 'Record payment' }).click()
+  await page.getByLabel('Invoice', { exact: true }).selectOption({ index: 1 })
+  await page.getByRole('button', { name: 'Continue' }).click()
+  await expect(page).toHaveURL(new RegExp(`invoice=${invoiceId}`))
+  await expect(page.getByTestId('record-balance-due')).toHaveText('$900.00')
+  await record(page, '300.00', { reference: 'CHK-1' })
+  // Started from Payments, so it returns there.
+  await expect(page).toHaveURL(/\/payments(\?|$)/)
+  await page.getByLabel('From').fill('')
+  await page.getByLabel('To').fill('')
+  await page.getByRole('button', { name: 'Filter' }).click()
+  const row = page.getByRole('row', { name: /CHK-1/ })
+  await expect(row).toContainText('Not reconciled')
+
+  // Match it to a bank line: it becomes reconciled and leaves the unreconciled view.
+  const db = adminDb()
+  const { data: acct } = await db.from('bank_accounts').insert({ firm_id: f.firmId, name: 'Main checking', kind: 'bank' }).select('id').single()
+  await f.manager.db.rpc('import_bank_lines', {
+    p_account: acct!.id,
+    p_file_name: 'x.ofx',
+    p_format: 'ofx',
+    p_lines: [{ posted_on: todayIso(), amount: '300.00', description: 'CHECK DEPOSIT', clean_description: 'CHECK DEPOSIT', bank_ref: 'R1', dedupe_key: 'fitid:R1' }],
+  })
+  const { data: line } = await db.from('bank_lines').select('id').eq('account_id', acct!.id).single()
+  const { data: pay } = await db.from('payments').select('id').eq('invoice_id', invoiceId).single()
+  await f.manager.db.rpc('link_bank_line', { p_line: line!.id, p_payment: pay!.id, p_expense: null })
+
+  await page.getByLabel('Show').selectOption('unreconciled')
+  await page.getByRole('button', { name: 'Filter' }).click()
+  await expect(page).toHaveURL(/bank=unreconciled/)
+  await expect(page.getByRole('row', { name: /CHK-1/ })).toHaveCount(0)
+  await page.getByLabel('Show').selectOption('reconciled')
+  await page.getByRole('button', { name: 'Filter' }).click()
+  await expect(page.getByRole('row', { name: /CHK-1/ })).toContainText('Reconciled · Main checking')
 })

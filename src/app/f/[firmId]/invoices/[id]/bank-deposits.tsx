@@ -24,12 +24,14 @@ export function BankDeposits({
   invoiceLabel,
   currency,
   deposits,
+  onRecorded,
 }: {
   firmId: string
   invoiceId: string
   invoiceLabel: string
   currency: string
   deposits: InvoiceDeposit[]
+  onRecorded?: () => void
 }) {
   const { pending, run, error } = useRun()
   const [notes, setNotes] = useState('')
@@ -92,7 +94,10 @@ export function BankDeposits({
                             `Record ${m(d.amount)} from ${d.accountName} on ${day(d.postedOn)} as a payment on ${invoiceLabel}?`,
                             { confirmLabel: 'Record payment' },
                           )
-                          if (ok) run(() => recordFromDepositAction(firmId, invoiceId, d.lineId, notes), () => setNotes(''))
+                          if (ok) run(() => recordFromDepositAction(firmId, invoiceId, d.lineId, notes), () => {
+                            setNotes('')
+                            onRecorded?.()
+                          })
                         }}
                       >
                         Record this payment<span className="sr-only"> of {m(d.amount)} on {d.postedOn}</span>

@@ -231,6 +231,9 @@ test('record an invoice payment from an imported deposit', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('3 new lines')
 
   await page.goto(`/f/${f.firmId}/invoices/${inv.invoiceId}`)
+  // The invoice page itself no longer holds the deposits; Record payment opens them.
+  await expect(page.getByRole('region', { name: 'Deposits from your bank' })).toHaveCount(0)
+  await page.getByRole('link', { name: 'Record payment', exact: true }).click()
   const panel = page.getByRole('region', { name: 'Deposits from your bank' })
   const deposit = panel.getByRole('row', { name: /GLOBEX CORP PAYMENT/ })
   await expect(deposit).toContainText('Exact balance')
@@ -239,8 +242,9 @@ test('record an invoice payment from an imported deposit', async ({ page }) => {
   await panel.getByLabel('Notes for the payment (optional)').fill('Paid by ACH')
   await deposit.getByRole('button', { name: /^Record this payment/ }).click()
   expect(await answerConfirm(page)).toMatch(/^Record \$1,500\.00 from Main checking on 2 Nov as a payment on /)
+  // Back on the invoice, now paid, with no Record payment button.
   await expect(page.getByTestId('status-badge')).toHaveText('Paid')
-  await expect(page.getByRole('region', { name: 'Deposits from your bank' })).toHaveCount(0)
+  await expect(page.getByRole('link', { name: 'Record payment', exact: true })).toHaveCount(0)
 
   await page.goto(`/f/${f.firmId}/bank`)
   await page.getByRole('link', { name: 'Main checking' }).click()
