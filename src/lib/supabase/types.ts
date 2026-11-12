@@ -948,6 +948,11 @@ isOneToOne: false
               "payment_count": number,"total": string
             }[]
                            },
+"platform_firms":
+{ Args: { "p_limit": number,"p_offset": number,"p_search": string }; Returns: {
+              "admin_emails": (string)[],"created_at": string,"id": string,"name": string,"total_count": number
+            }[]
+                           },
 "platform_list_firms":
 { Args: Record<PropertyKey, never>; Returns: {
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
