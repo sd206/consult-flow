@@ -1,7 +1,12 @@
 import { requireFirmRole } from "@/lib/auth/context";
 import { todayIso } from "@/lib/domain/dates";
 import { formatMoney } from "@/lib/domain/money";
-import { getPnl, parsePnlParams, type PnlRow } from "@/modules/reports/pnl";
+import {
+  getPnl,
+  parsePnlParams,
+  pnlBreakdownColumns,
+  type PnlRow,
+} from "@/modules/reports/pnl";
 import { listClients } from "@/modules/clients/data";
 import { getFirm } from "@/modules/firms/data";
 import { listProjects } from "@/modules/projects/data";
@@ -88,6 +93,10 @@ export default async function PnlPage({
   const result = p ? await getPnl(db, firmId, p) : null;
   const periodic = p ? p.group === "month" || p.group === "quarter" : false;
   const filtered = !!p && (p.clientIds !== null || p.projectIds !== null);
+  const cols = p
+    ? pnlBreakdownColumns(p)
+    : { client: false, project: false };
+  const byProject = p?.group === "project";
   const error = !parsed.ok
     ? parsed.error
     : result && !result.ok
@@ -116,6 +125,7 @@ export default async function PnlPage({
         }
         to={p?.to ?? (typeof sp.to === "string" ? sp.to : today)}
         group={p?.group ?? "month"}
+        split={p?.split ?? { client: false, project: false }}
         clients={clients}
         projects={projects}
         selectedClients={p?.clientIds ?? []}
@@ -142,7 +152,14 @@ export default async function PnlPage({
               <thead>
                 <tr className="border-b">
                   {[
-                    "Group",
+                    // Project grouping: Client and Project are the row labels (no Group column).
+                    ...(byProject
+                      ? ["Client", "Project"]
+                      : [
+                          "Group",
+                          ...(cols.client ? ["Client"] : []),
+                          ...(cols.project ? ["Project"] : []),
+                        ]),
                     "Revenue",
                     "Labour cost",
                     "Gross profit",
@@ -167,18 +184,43 @@ export default async function PnlPage({
                       : r.kind === "total"
                         ? "Total"
                         : r.label;
+                  // Project grouping: the client is the row header and the project
+                  // follows; Total / Unallocated overhead sit in the client column.
+                  const shownLabel =
+                    byProject && r.kind === "group" ? (r.clientLabel ?? "") : label;
+                  const bold = r.kind === "total" || r.kind === "subtotal";
+                  // Client and project rows have no overhead of their own.
+                  const noOverhead =
+                    !periodic &&
+                    (r.kind === "group" ||
+                      r.kind === "detail" ||
+                      r.kind === "subtotal");
                   const tip = `Hours ${formatMoney(r.revenueHours, currency)} + fees ${formatMoney(r.fees, currency)} − discounts ${formatMoney(r.discounts, currency)}`;
                   return (
                     <tr
                       key={`${r.kind}:${r.key}`}
-                      className={`border-b ${r.kind === "total" ? "font-bold" : ""}`}
+                      className={`border-b ${bold ? "font-bold" : ""} ${r.kind === "subtotal" ? "bg-selected" : ""}`}
                     >
                       <th
                         scope="row"
-                        className={`${td} text-left ${r.kind === 'total' ? 'font-bold' : 'font-normal'}`}
+                        className={`${td} text-left ${bold ? "font-bold" : "font-normal"}`}
                       >
-                        {label}
+                        {shownLabel}
                       </th>
+                      {byProject ? (
+                        <td className={td}>
+                          {r.kind === "group" ? (r.projectLabel ?? "") : ""}
+                        </td>
+                      ) : (
+                        <>
+                          {cols.client && (
+                            <td className={td}>{r.clientLabel ?? ""}</td>
+                          )}
+                          {cols.project && (
+                            <td className={td}>{r.projectLabel ?? ""}</td>
+                          )}
+                        </>
+                      )}
                       <td className={td} title={tip}>
                         {money(r.revenue)}
                       </td>
@@ -188,9 +230,7 @@ export default async function PnlPage({
                         {r.kind === "overhead" ? "—" : money(r.directExpenses)}
                       </td>
                       <td className={td}>
-                        {r.kind === "group" && !periodic
-                          ? "—"
-                          : money(r.overhead)}
+                        {noOverhead ? "—" : money(r.overhead)}
                       </td>
                       <td className={td}>{money(r.net)}</td>
                       <td className={td}>

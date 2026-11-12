@@ -683,6 +683,11 @@ isOneToOne: false
               "amount": string,"category_id": string,"category_name": string,"client_id": string,"client_name": string,"id": string,"payee": string,"project_id": string,"project_name": string,"receipt_count": number,"spent_on": string
             }[]
                            },
+"list_payments":
+{ Args: { "p_client": string,"p_firm": string,"p_from": string,"p_limit": number,"p_offset": number,"p_to": string }; Returns: {
+              "amount": string,"client_id": string,"client_name": string,"file_count": number,"invoice_id": string,"invoice_number": string,"invoice_status": string,"method": string,"paid_on": string,"payment_id": string,"reference": string
+            }[]
+                           },
 "my_assignments":
 { Args: { "p_firm": string }; Returns: {
               "assignment_id": string,"client_name": string,"effective_from": string,"effective_to": string,"project_code": string,"project_id": string,"project_name": string
@@ -713,9 +718,19 @@ isOneToOne: false
         isOneToOne: true
         isSetofReturn: false
       } },
+"payment_totals":
+{ Args: { "p_client": string,"p_firm": string,"p_from": string,"p_to": string }; Returns: {
+              "payment_count": number,"total": string
+            }[]
+                           },
 "platform_list_firms":
 { Args: Record<PropertyKey, never>; Returns: {
               "admin_emails": (string)[],"created_at": string,"id": string,"name": string
+            }[]
+                           },
+"pnl_breakdown":
+{ Args: { "p_clients": (string)[],"p_firm": string,"p_from": string,"p_group": string,"p_projects": (string)[],"p_split_project": boolean,"p_to": string }; Returns: {
+              "client_id": string,"client_label": string,"collected": string,"direct_expenses": string,"discounts": string,"fees": string,"gross": string,"group_key": string,"invoiced": string,"labour": string,"margin": string,"net": string,"overhead": string,"project_id": string,"project_label": string,"revenue": string,"revenue_hours": string,"sort_key": string
             }[]
                            },
 "pnl_facts":
@@ -725,7 +740,7 @@ isOneToOne: false
                            },
 "pnl_report":
 { Args: { "p_clients": (string)[],"p_firm": string,"p_from": string,"p_group": string,"p_projects": (string)[],"p_to": string }; Returns: {
-              "collected": string,"direct_expenses": string,"discounts": string,"fees": string,"gross": string,"group_key": string,"invoiced": string,"label": string,"labour": string,"margin": string,"net": string,"overhead": string,"revenue": string,"revenue_hours": string,"row_kind": string,"sort_key": string
+              "client_label": string,"collected": string,"direct_expenses": string,"discounts": string,"fees": string,"gross": string,"group_key": string,"invoiced": string,"label": string,"labour": string,"margin": string,"net": string,"overhead": string,"project_label": string,"revenue": string,"revenue_hours": string,"row_kind": string,"sort_key": string
             }[]
                            },
 "record_payment":

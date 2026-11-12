@@ -410,7 +410,14 @@ describe('getPnl', () => {
   it('maps the March row and rejects consultants', async () => {
     const f = await newFirm('PnL Data Firm')
     await seedPnlScenario(f)
-    const params = { from: '2026-03-01', to: '2026-05-31', group: 'month' as const, clientIds: null, projectIds: null }
+    const params = {
+      from: '2026-03-01',
+      to: '2026-05-31',
+      group: 'month' as const,
+      clientIds: null,
+      projectIds: null,
+      split: { client: false, project: false },
+    }
     const res = await getPnl(f.manager.db, f.firmId, params)
     if (!res.ok) throw new Error(res.error)
     expect(res.data.find((r) => r.label === 'Mar 2026')).toMatchObject({
@@ -511,4 +518,349 @@ describe('pnl_report: sub-cent rounding', () => {
     expect(row(rows, 'Apr 2026')).toMatchObject({ revenue: '33.17', labour: '3.30', gross: '29.87' })
     expect(row(rows, 'Total')).toMatchObject({ revenue: '66.33', labour: '6.61', gross: '59.72', net: '59.72' })
   }, 60_000)
+})
+
+// ---------------------------------------------------------------------------
+// Breakdown columns (brief B2). Same scenario as above; expected values follow
+// from it (see the per-row arithmetic in the comments).
+// ---------------------------------------------------------------------------
+
+type BreakdownRow = Omit<PnlRow, 'row_kind' | 'label'> & {
+  client_id: string | null
+  client_label: string
+  project_id: string | null
+  project_label: string | null
+}
+
+function callBreakdown(
+  db: SupabaseClient,
+  firmId: string,
+  from: string,
+  to: string,
+  group: string,
+  splitProject: boolean,
+  filters: { clients?: string[] | null; projects?: string[] | null } = {},
+) {
+  return db.rpc('pnl_breakdown', {
+    p_firm: firmId,
+    p_from: from,
+    p_to: to,
+    p_group: group,
+    p_clients: filters.clients ?? null,
+    p_projects: filters.projects ?? null,
+    p_split_project: splitProject,
+  })
+}
+
+async function breakdown(...args: Parameters<typeof callBreakdown>): Promise<BreakdownRow[]> {
+  const { data, error } = await callBreakdown(...args)
+  if (error) throw new Error(`pnl_breakdown failed: ${error.message}`)
+  return data as BreakdownRow[]
+}
+
+function detail(rows: BreakdownRow[], groupKey: string, client: string, project: string | null = null): BreakdownRow {
+  const r = rows.find((x) => x.group_key === groupKey && x.client_label === client && x.project_label === project)
+  if (!r) {
+    const have = rows.map((x) => `${x.group_key}/${x.client_label}/${x.project_label}`).join(', ')
+    throw new Error(`no detail ${groupKey}/${client}/${project} in ${have}`)
+  }
+  return r
+}
+
+const toCents = (v: string) => Math.round(Number(v) * 100)
+
+describe('pnl_breakdown', () => {
+  let f: Firm
+  let ids: PnlIds
+
+  beforeAll(async () => {
+    f = await newFirm('PnL Breakdown Firm')
+    ids = await seedPnlScenario(f)
+  }, 60_000)
+
+  describe('by month, client split', () => {
+    let rows: BreakdownRow[]
+    let groups: PnlRow[]
+    beforeAll(async () => {
+      rows = await breakdown(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'month', false)
+      groups = await report(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'month')
+    })
+
+    it('has one row per period x client with activity, overhead last in its period', () => {
+      expect(rows.map((r) => [r.group_key, r.client_id, r.client_label, r.project_id, r.project_label])).toEqual([
+        ['2026-03-01', ids.globexId, 'Globex', null, null],
+        ['2026-03-01', ids.initechId, 'Initech', null, null],
+        ['2026-04-01', ids.globexId, 'Globex', null, null],
+        ['2026-04-01', null, 'Overhead', null, null],
+        ['2026-05-01', ids.globexId, 'Globex', null, null],
+      ])
+      const keys = rows.map((r) => r.sort_key)
+      expect([...keys].sort()).toEqual(keys)
+    })
+
+    it('March Globex: Dana 10 h x 150 = 1500, x 90 = 900, Portal travel 120', () => {
+      // net 1500 - 900 - 120 = 480; margin 480 / 1500 = 32.0 %
+      expect(detail(rows, '2026-03-01', 'Globex')).toMatchObject({
+        revenue_hours: '1500.00',
+        fees: '0.00',
+        discounts: '0.00',
+        revenue: '1500.00',
+        labour: '900.00',
+        gross: '600.00',
+        direct_expenses: '120.00',
+        overhead: '0.00',
+        net: '480.00',
+        margin: '32.0',
+        invoiced: '0.00',
+        collected: '0.00',
+      })
+    })
+
+    it('March Initech: Lee 4 h x 200 = 800, x 120 = 480, software 60', () => {
+      // net 800 - 480 - 60 = 260; margin 260 / 800 = 32.5 %
+      expect(detail(rows, '2026-03-01', 'Initech')).toMatchObject({
+        revenue_hours: '800.00',
+        revenue: '800.00',
+        labour: '480.00',
+        gross: '320.00',
+        direct_expenses: '60.00',
+        overhead: '0.00',
+        net: '260.00',
+        margin: '32.5',
+      })
+    })
+
+    it('the March details sum to the March group row', () => {
+      const march = rows.filter((r) => r.group_key === '2026-03-01')
+      const group = row(groups, 'Mar 2026')
+      for (const k of MONEY) {
+        const sum = march.reduce((s, r) => s + toCents(r[k]), 0)
+        // Each detail row is rounded on its own, so allow half a cent per row.
+        expect(Math.abs(sum - toCents(group[k]))).toBeLessThanOrEqual(march.length * 0.5)
+      }
+      // Every amount in this scenario is whole cents, so here the sums are exact.
+      expect(march.reduce((s, r) => s + toCents(r.net), 0)).toBe(74000)
+      expect(march.reduce((s, r) => s + toCents(r.revenue), 0)).toBe(230000)
+    })
+
+    it('April: Globex fees and discount, plus an Overhead row of 75.00', () => {
+      // Invoice A: Setup fee 300, discount 10 % of 1800 = 180, invoiced 1800 - 180 = 1620.
+      // revenue 300 - 180 = 120, net 120, margin 120 / 120 = 100.0 %
+      expect(detail(rows, '2026-04-01', 'Globex')).toMatchObject({
+        revenue_hours: '0.00',
+        fees: '300.00',
+        discounts: '180.00',
+        revenue: '120.00',
+        labour: '0.00',
+        gross: '120.00',
+        overhead: '0.00',
+        net: '120.00',
+        margin: '100.0',
+        invoiced: '1620.00',
+        collected: '0.00',
+      })
+      expect(detail(rows, '2026-04-01', 'Overhead')).toMatchObject({
+        client_id: null,
+        revenue: '0.00',
+        direct_expenses: '0.00',
+        overhead: '75.00',
+        net: '-75.00',
+        margin: null,
+      })
+    })
+
+    it('May: only the Globex collection, 1000 x 1620 / 1753.65 = 923.79', () => {
+      expect(detail(rows, '2026-05-01', 'Globex')).toMatchObject({
+        revenue: '0.00',
+        net: '0.00',
+        margin: null,
+        collected: '923.79',
+      })
+    })
+
+    it('a client filter drops the overhead row', async () => {
+      const filtered = await breakdown(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'month', false, {
+        clients: [ids.globexId],
+      })
+      expect(filtered.map((r) => [r.group_key, r.client_label])).toEqual([
+        ['2026-03-01', 'Globex'],
+        ['2026-04-01', 'Globex'],
+        ['2026-05-01', 'Globex'],
+      ])
+    })
+
+    it('a project filter keeps only that project', async () => {
+      const filtered = await breakdown(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'month', false, {
+        projects: [ids.portalId],
+      })
+      expect(filtered.map((r) => [r.group_key, r.client_label])).toEqual([['2026-03-01', 'Globex']])
+      expect(filtered[0]).toMatchObject({ revenue: '1500.00', net: '480.00' })
+    })
+  })
+
+  it('by month with a project split: period x client x project', async () => {
+    const rows = await breakdown(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'month', true)
+    expect(rows.map((r) => [r.group_key, r.client_label, r.project_id, r.project_label])).toEqual([
+      ['2026-03-01', 'Globex', ids.portalId, 'Portal'],
+      ['2026-03-01', 'Initech', ids.auditId, 'Audit'],
+      ['2026-03-01', 'Initech', null, 'no project'],
+      ['2026-04-01', 'Globex', null, 'no project'],
+      ['2026-04-01', 'Overhead', null, null],
+      ['2026-05-01', 'Globex', null, 'no project'],
+    ])
+    // Initech/Audit: 800 - 480 = 320, margin 40.0 %; Initech/no project: the 60.00 software expense.
+    expect(detail(rows, '2026-03-01', 'Initech', 'Audit')).toMatchObject({ revenue: '800.00', net: '320.00', margin: '40.0' })
+    expect(detail(rows, '2026-03-01', 'Initech', 'no project')).toMatchObject({
+      direct_expenses: '60.00',
+      net: '-60.00',
+      margin: null,
+    })
+  })
+
+  it('by quarter with a client split', async () => {
+    const rows = await breakdown(f.manager.db, f.firmId, '2026-01-01', '2026-06-30', 'quarter', false)
+    expect(rows.map((r) => [r.group_key, r.client_label, r.revenue, r.net])).toEqual([
+      ['2026-01-01', 'Globex', '1500.00', '480.00'],
+      ['2026-01-01', 'Initech', '800.00', '260.00'],
+      ['2026-04-01', 'Globex', '120.00', '120.00'],
+      ['2026-04-01', 'Overhead', '0.00', '-75.00'],
+    ])
+  })
+
+  describe('by client, project split', () => {
+    let rows: BreakdownRow[]
+    let byProject: PnlRow[]
+    beforeAll(async () => {
+      rows = await breakdown(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'client', false)
+      byProject = await report(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'project')
+    })
+
+    it('has one row per client x project, no overhead', () => {
+      expect(rows.map((r) => [r.group_key, r.client_label, r.project_label])).toEqual([
+        [ids.globexId, 'Globex', 'Portal'],
+        [ids.globexId, 'Globex', 'no project'],
+        [ids.initechId, 'Initech', 'Audit'],
+        [ids.initechId, 'Initech', 'no project'],
+      ])
+    })
+
+    it('the rows equal the project-grouping figures', () => {
+      const pick = (r: Record<string, unknown>) => Object.fromEntries([...MONEY, 'margin'].map((k) => [k, r[k]]))
+      expect(pick(detail(rows, ids.globexId, 'Globex', 'Portal'))).toEqual(pick(row(byProject, 'Globex — Portal')))
+      expect(pick(detail(rows, ids.globexId, 'Globex', 'no project'))).toEqual(pick(row(byProject, 'Globex — no project')))
+      expect(pick(detail(rows, ids.initechId, 'Initech', 'Audit'))).toEqual(pick(row(byProject, 'Initech — Audit')))
+      expect(pick(detail(rows, ids.initechId, 'Initech', 'no project'))).toEqual(pick(row(byProject, 'Initech — no project')))
+      expect(detail(rows, ids.globexId, 'Globex', 'Portal')).toMatchObject({ revenue: '1500.00', net: '480.00' })
+      expect(detail(rows, ids.globexId, 'Globex', 'no project')).toMatchObject({
+        revenue: '120.00',
+        net: '120.00',
+        invoiced: '1620.00',
+        collected: '923.79',
+      })
+    })
+  })
+
+  describe('errors and access', () => {
+    it("rejects 'project' and unknown groupings", async () => {
+      for (const g of ['project', 'week']) {
+        const { error } = await callBreakdown(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', g, false)
+        expect(errorText(error)).toContain('PNL_GROUP_INVALID')
+      }
+    })
+
+    it('rejects a reversed range', async () => {
+      const { error } = await callBreakdown(f.manager.db, f.firmId, '2026-05-01', '2026-04-30', 'month', false)
+      expect(errorText(error)).toContain('PNL_RANGE_INVALID')
+    })
+
+    it('admins may run it', async () => {
+      const rows = await breakdown(f.admin.db, f.firmId, '2026-03-01', '2026-05-31', 'month', false)
+      expect(rows).toHaveLength(5)
+    })
+
+    it('consultants get 42501', async () => {
+      const { error } = await callBreakdown(f.consultant.db, f.firmId, '2026-03-01', '2026-05-31', 'month', false)
+      expect(error?.code).toBe('42501')
+    })
+
+    it("another firm's manager gets 42501", async () => {
+      const other = await newFirm('Other PnL Breakdown Firm')
+      const { error } = await callBreakdown(other.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'client', false)
+      expect(error?.code).toBe('42501')
+    })
+  })
+
+  it('pnl_report returns the client and project names under project grouping', async () => {
+    const { data, error } = await call(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'project')
+    if (error) throw new Error(error.message)
+    const rows = data as (PnlRow & { client_label: string | null; project_label: string | null })[]
+    expect(rows.map((r) => [r.label, r.client_label, r.project_label])).toEqual([
+      ['Globex — Portal', 'Globex', 'Portal'],
+      ['Globex — no project', 'Globex', 'no project'],
+      ['Initech — Audit', 'Initech', 'Audit'],
+      ['Initech — no project', 'Initech', 'no project'],
+      ['Unallocated overhead', null, null],
+      ['Total', null, null],
+    ])
+    const byMonth = await call(f.manager.db, f.firmId, '2026-03-01', '2026-05-31', 'month')
+    const monthRows = byMonth.data as { client_label: string | null; project_label: string | null }[]
+    expect(monthRows).toHaveLength(4)
+    expect(monthRows.every((r) => r.client_label === null && r.project_label === null)).toBe(true)
+  })
+
+  describe('getPnl with a split', () => {
+    const base = { from: '2026-03-01', to: '2026-05-31', clientIds: null, projectIds: null }
+
+    it('interleaves detail rows and subtotals by month', async () => {
+      const res = await getPnl(f.manager.db, f.firmId, { ...base, group: 'month', split: { client: true, project: false } })
+      if (!res.ok) throw new Error(res.error)
+      expect(res.data.map((r) => [r.kind, r.label, r.clientLabel, r.projectLabel])).toEqual([
+        ['detail', 'Mar 2026', 'Globex', null],
+        ['detail', 'Mar 2026', 'Initech', null],
+        ['subtotal', 'Mar 2026 subtotal', null, null],
+        ['detail', 'Apr 2026', 'Globex', null],
+        ['detail', 'Apr 2026', 'Overhead', null],
+        ['subtotal', 'Apr 2026 subtotal', null, null],
+        ['detail', 'May 2026', 'Globex', null],
+        ['subtotal', 'May 2026 subtotal', null, null],
+        ['total', 'Total', null, null],
+      ])
+      expect(res.data[0]).toMatchObject({ revenue: '1500.00', net: '480.00', margin: '32.0' })
+      expect(res.data[2]).toMatchObject({ revenue: '2300.00', net: '740.00', margin: '32.2' })
+      expect(res.data.at(-1)).toMatchObject({ net: '785.00' })
+      expect(new Set(res.data.map((r) => `${r.kind}:${r.key}`)).size).toBe(res.data.length)
+    })
+
+    it('interleaves project rows and subtotals by client, then overhead and total', async () => {
+      const res = await getPnl(f.manager.db, f.firmId, { ...base, group: 'client', split: { client: false, project: true } })
+      if (!res.ok) throw new Error(res.error)
+      expect(res.data.map((r) => [r.kind, r.label, r.clientLabel, r.projectLabel, r.net])).toEqual([
+        ['detail', 'Globex', 'Globex', 'Portal', '480.00'],
+        ['detail', 'Globex', 'Globex', 'no project', '120.00'],
+        ['subtotal', 'Globex subtotal', null, null, '600.00'],
+        ['detail', 'Initech', 'Initech', 'Audit', '320.00'],
+        ['detail', 'Initech', 'Initech', 'no project', '-60.00'],
+        ['subtotal', 'Initech subtotal', null, null, '260.00'],
+        ['overhead', 'Unallocated overhead', null, null, '-75.00'],
+        ['total', 'Total', null, null, '785.00'],
+      ])
+    })
+
+    it('fills client and project labels under project grouping; null otherwise', async () => {
+      const res = await getPnl(f.manager.db, f.firmId, { ...base, group: 'project', split: { client: false, project: false } })
+      if (!res.ok) throw new Error(res.error)
+      expect(res.data.map((r) => [r.kind, r.clientLabel, r.projectLabel])).toEqual([
+        ['group', 'Globex', 'Portal'],
+        ['group', 'Globex', 'no project'],
+        ['group', 'Initech', 'Audit'],
+        ['group', 'Initech', 'no project'],
+        ['overhead', null, null],
+        ['total', null, null],
+      ])
+      const month = await getPnl(f.manager.db, f.firmId, { ...base, group: 'month', split: { client: false, project: false } })
+      if (!month.ok) throw new Error(month.error)
+      expect(month.data.map((r) => r.kind)).toEqual(['group', 'group', 'group', 'total'])
+      expect(month.data.every((r) => r.clientLabel === null && r.projectLabel === null)).toBe(true)
+    })
+  })
 })

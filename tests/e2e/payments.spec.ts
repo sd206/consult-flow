@@ -214,3 +214,35 @@ test('manager dashboard shows outstanding total', async ({ page }) => {
   await expect(page.getByTestId('outstanding')).toContainText('$3,000.03')
   await expect(page.getByTestId('overdue')).toContainText('$0.00')
 })
+
+test('payments page lists a recorded payment and links to the invoice', async ({ page }) => {
+  const f = await newFirm('Payments List Firm')
+  const inv = await issueManualInvoice(f, '900.00')
+  const { error } = await f.manager.db.rpc('record_payment', {
+    p_invoice: inv.invoiceId,
+    p_amount: '123.45',
+    p_paid_on: todayIso(),
+    p_method: 'check',
+    p_reference: 'LIST-REF-1',
+    p_notes: null,
+  })
+  expect(error).toBeNull()
+  await login(page, f.manager.email)
+  await goTo(page, 'Billing', 'Payments')
+  await expect(page.getByRole('heading', { name: 'Payments' })).toBeVisible()
+  const row = page.getByRole('row', { name: /LIST-REF-1/ })
+  await expect(row).toBeVisible()
+  await expect(row).toContainText('$123.45')
+  await expect(row).toContainText('Check')
+  await expect(page.getByText('1 payment · $123.45')).toBeVisible()
+  await row.getByRole('link', { name: /.+/ }).first().click()
+  await expect(page).toHaveURL(new RegExp(`/invoices/${inv.invoiceId}`))
+  await expect(page.getByTestId('balance-due')).toHaveText('$776.55')
+})
+
+test('a consultant gets a 404 on the payments page', async ({ page }) => {
+  const f = await newFirm('Payments 404 Firm')
+  await login(page, f.consultant.email)
+  const res = await page.goto(`/f/${f.firmId}/payments`)
+  expect(res?.status()).toBe(404)
+})

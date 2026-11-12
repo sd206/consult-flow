@@ -25,6 +25,7 @@ const NAV: (Item | Group)[] = [
     items: [
       { label: 'Invoices', path: '/invoices', roles: MANAGERS },
       { label: 'Unpaid invoices', path: '/invoices/unpaid', roles: MANAGERS },
+      { label: 'Payments', path: '/payments', roles: MANAGERS },
       { label: 'Expenses', path: '/expenses', roles: MANAGERS },
     ],
   },
