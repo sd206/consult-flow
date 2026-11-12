@@ -143,3 +143,19 @@ test('a deposit recorded as other income shows on the Transactions report', asyn
   await expect(txn).toContainText('$1,234.50')
   await expect(txn).toContainText('November interest')
 })
+
+test('a statement between 3 MB and 5 MB uploads', async ({ page }) => {
+  const f = await newFirm('Bank Big File Firm')
+  await login(page, f.manager.email)
+  await addAccount(page, f.firmId, 'Busy checking', 'Bank')
+  const memo = 'M'.repeat(4000)
+  const txns = Array.from(
+    { length: 1000 },
+    (_, i) => `<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20261102<TRNAMT>-1.00<FITID>BIG${i}<NAME>VENDOR ${i}<MEMO>${memo}</STMTTRN>`,
+  ).join('\n')
+  const body = `OFXHEADER:100\nDATA:OFXSGML\n\n<OFX><BANKMSGSRSV1><STMTTRNRS><STMTRS><BANKTRANLIST>\n${txns}\n</BANKTRANLIST></STMTRS></STMTTRNRS></BANKMSGSRSV1></OFX>\n`
+  expect(body.length).toBeGreaterThan(3.5 * 1024 * 1024)
+  await page.getByLabel('Statement file').setInputFiles({ name: 'big.qfx', mimeType: 'application/x-ofx', buffer: Buffer.from(body) })
+  await page.getByRole('button', { name: 'Upload', exact: true }).click()
+  await expect(page.getByRole('status')).toContainText('1000 new lines, 0 already imported', { timeout: 30000 })
+})

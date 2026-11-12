@@ -93,6 +93,17 @@ describe('CSV', () => {
     expect(ok(parseCsv(csv('02/30/2026'), fmt('MDY'))).errors).toHaveLength(1)
   })
 
+  it('refuses comma-decimal amounts instead of reading them 100 times too large', () => {
+    const m = { ...signed(false), dateFormat: 'YMD' as const }
+    const csv = ['D,X,A', '2026-01-02,Fee,"-12,50"', '2026-01-03,Rent,"1.234,5"', '2026-01-04,Big,"1,234"', ''].join('\n')
+    const r = ok(parseCsv(csv, m))
+    expect(r.lines.map((l) => l.amount)).toEqual(['1234.00'])
+    expect(r.errors).toEqual([
+      { row: 2, reason: 'The amount is zero or missing.' },
+      { row: 3, reason: 'The amount is zero or missing.' },
+    ])
+  })
+
   it('reads negatives in parentheses', () => {
     expect(ok(parseCsv('D,X,A\n2026-01-02,Fee,(12.5)\n', { ...signed(false), dateFormat: 'YMD' })).lines[0].amount).toBe(
       '-12.50',

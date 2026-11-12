@@ -72,6 +72,16 @@ describe('bank functions', () => {
     expect(count).toBe(1)
   })
 
+  it('cuts a long bank reference to fit the payment reference', async () => {
+    const inv = await issueManualInvoice(f, 1000)
+    const ref = 'R'.repeat(200)
+    const line = await oneLine(f, bank, { posted_on: D, amount: '10.00', description: 'LONG REF', bank_ref: ref })
+    const r = await f.manager.db.rpc('confirm_bank_line_payment', { p_line: line, p_invoice: inv.invoiceId, p_notes: null })
+    expect(r.error).toBeNull()
+    const { data } = await adminDb().from('payments').select('reference').eq('id', r.data).single()
+    expect(data!.reference).toBe('R'.repeat(120))
+  })
+
   it('lets only one of two concurrent confirms through', async () => {
     const inv = await issueManualInvoice(f, 1000)
     const line = await oneLine(f, bank, { posted_on: D, amount: '100.00', description: 'RACE' })

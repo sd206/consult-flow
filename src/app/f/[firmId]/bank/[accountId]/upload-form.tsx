@@ -26,6 +26,10 @@ export function UploadForm({ firmId, accountId, hasMapping }: { firmId: string; 
       setError('Choose a statement file.')
       return
     }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('This file is larger than 5 MB.')
+      return
+    }
     const fd = new FormData()
     fd.set('file', file)
     if (mapping) fd.set('mapping', JSON.stringify(mapping))

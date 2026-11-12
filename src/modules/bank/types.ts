@@ -23,10 +23,15 @@ export type CsvMapping = {
 const AMOUNT = /^(-)?(\d+)(?:\.(\d{1,2}))?$/
 
 /**
- * "1,234.5" / "$12.00" / "(12.50)" / "-3" → signed two-decimal string, or null when unreadable.
+ * "1,234.5" / "$12.00" / "(12.50)" / "-3" → signed two-decimal string, or null when unreadable
+ * (including comma-decimal amounts such as "12,50").
  * Zero comes back as "0.00"; callers decide whether that is allowed.
  */
 export function normaliseAmount(raw: string): string | null {
+  // A comma used as the decimal mark ("12,50", "1.234,5") would otherwise read 100x too large:
+  // refuse it unless it is a thousands separator (exactly three digits after it, and before any dot).
+  const lastComma = raw.lastIndexOf(',')
+  if (lastComma >= 0 && lastComma > raw.lastIndexOf('.') && !/^,\d{3}(\D*)$/.test(raw.slice(lastComma))) return null
   let v = raw.trim().replace(/[$£€\s,]/g, '')
   let neg = false
   const paren = /^\((.*)\)$/.exec(v)
