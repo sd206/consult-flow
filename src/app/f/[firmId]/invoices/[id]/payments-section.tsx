@@ -1,5 +1,7 @@
 'use client'
 
+import Link from 'next/link'
+
 import { askConfirm } from '@/components/confirm-dialog'
 import { useState } from 'react'
 import { FileList } from '@/components/attachments/file-list'
@@ -79,16 +81,18 @@ function FilesInput({ id, label, error }: { id: string; label: string; error?: s
   )
 }
 
-function RecordForm({
+export function RecordForm({
   firmId,
   invoiceId,
   balanceDue,
   onWarning,
+  onRecorded,
 }: {
   firmId: string
   invoiceId: string
   balanceDue: string
   onWarning: (w: string | null) => void
+  onRecorded?: () => void
 }) {
   const { pending, run, errors, error } = useRun()
   const [resets, setResets] = useState(0)
@@ -110,7 +114,10 @@ function RecordForm({
             onWarning(notAttached('recorded', await uploadPaymentFiles(firmId, invoiceId, r.data.id, files)))
             return r
           },
-          () => setResets((n) => n + 1),
+          () => {
+            setResets((n) => n + 1)
+            onRecorded?.()
+          },
         )
       }}
     >
@@ -330,7 +337,6 @@ export function PaymentsSection({
 }: Props) {
   const editable = status !== 'void'
   const canRecord = status === 'issued' || status === 'partly_paid'
-  const [warning, setWarning] = useState<string | null>(null)
   const m = (v: string) => formatMoney(v, currency)
   return (
     <section id="payments" className="mt-10">
@@ -384,11 +390,13 @@ export function PaymentsSection({
         <p className="mt-4 text-sm text-muted-foreground">No payments recorded.</p>
       )}
 
-      {canRecord && <RecordForm firmId={firmId} invoiceId={invoiceId} balanceDue={balanceDue} onWarning={setWarning} />}
-      {warning && (
-        <p role="status" className="mt-3 text-sm">
-          {warning}
-        </p>
+      {canRecord && (
+        <Link
+          href={`/f/${firmId}/payments/record?invoice=${invoiceId}`}
+          className="mt-6 inline-flex h-8 items-center rounded-lg bg-primary px-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Record payment
+        </Link>
       )}
     </section>
   )

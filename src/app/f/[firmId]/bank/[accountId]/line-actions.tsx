@@ -15,6 +15,7 @@ import {
   linkLineAction,
 } from '@/modules/bank/actions'
 import type { BankLine, Candidates } from '@/modules/bank/data'
+import { payeeFromDescription } from '@/modules/bank/filter'
 
 export type Option = { id: string; name: string }
 export type ProjectOption = { id: string; name: string; clientId: string }
@@ -23,10 +24,6 @@ type Mode = 'payment' | 'other_income' | 'expense' | 'existing' | 'ignore'
 
 const select = 'h-8 w-full rounded-lg border bg-card px-2 text-sm'
 
-/** Strips noise for a default payee/source: "AWS EMEA – ACH" → "AWS EMEA". */
-function defaultName(description: string): string {
-  return description.split(' – ')[0].trim().slice(0, 120)
-}
 
 export function LineActions({
   firmId,
@@ -149,7 +146,7 @@ export function LineActions({
         <form aria-label="Other income" className="grid max-w-xl gap-3" onSubmit={submit((fd) => confirmOtherIncomeAction(firmId, accountId, line.id, fd))}>
           <div className="grid gap-1.5">
             <Label htmlFor={`src-${line.id}`}>Received from</Label>
-            <Input id={`src-${line.id}`} name="source" defaultValue={defaultName(line.description)} aria-invalid={!!errors.source} />
+            <Input id={`src-${line.id}`} name="source" defaultValue={payeeFromDescription(line.description)} aria-invalid={!!errors.source} />
             {errors.source && <p className="text-xs text-destructive">{errors.source}</p>}
           </div>
           <CategorySelect id={`oc-${line.id}`} options={incomeCategories} error={errors.categoryId} />
@@ -166,7 +163,7 @@ export function LineActions({
         <form aria-label="Expense" className="grid max-w-xl gap-3" onSubmit={submit((fd) => confirmExpenseAction(firmId, accountId, line.id, fd))}>
           <div className="grid gap-1.5">
             <Label htmlFor={`payee-${line.id}`}>Payee</Label>
-            <Input id={`payee-${line.id}`} name="payee" defaultValue={defaultName(line.description)} aria-invalid={!!errors.payee} />
+            <Input id={`payee-${line.id}`} name="payee" defaultValue={payeeFromDescription(line.description)} aria-invalid={!!errors.payee} />
             {errors.payee && <p className="text-xs text-destructive">{errors.payee}</p>}
           </div>
           <CategorySelect id={`ec-${line.id}`} options={categories} defaultValue={line.suggestedCategoryId ?? ''} error={errors.categoryId} />

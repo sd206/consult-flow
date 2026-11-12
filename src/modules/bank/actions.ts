@@ -15,6 +15,7 @@ import {
   ignoreLines,
   importStatement,
   linkLine,
+  markDuplicates,
   resetLine,
   saveCsvMapping,
   setAccountActive,
@@ -23,6 +24,7 @@ import {
   type ImportOutcome,
 } from './data'
 import { readCsv } from './csv'
+import { payeeFromDescription } from './filter'
 import { statementFormat } from './parse'
 import {
   accountSchema,
@@ -187,28 +189,107 @@ export async function confirmOtherIncomeAction(
   return r.ok ? { ok: true, data: undefined } : r
 }
 
+async function loadLines(db: Awaited<ReturnType<typeof requireFirmRole>>['db'], ids: string[]) {
+  const clean = ids.filter((id) => UUID.test(id)).slice(0, 500)
+  if (clean.length === 0) return new Map<string, { description: string; amount: string }>()
+  const { data } = await db.from('bank_lines').select('id, description, amount::text').in('id', clean).eq('status', 'new')
+  return new Map(((data ?? []) as { id: string; description: string; amount: string }[]).map((l) => [l.id, l]))
+}
+
+export type BulkOutcome = { recorded: number; failed: number; reasons: string[] }
+
+/** Records each line as an expense or other income, one at a time; lines that fail stay in review. */
+async function recordAll(
+  db: Awaited<ReturnType<typeof requireFirmRole>>['db'],
+  jobs: { lineId: string; run: (payee: string) => Promise<Result<string>> }[],
+): Promise<BulkOutcome> {
+  const lines = await loadLines(db, jobs.map((j) => j.lineId))
+  const out: BulkOutcome = { recorded: 0, failed: 0, reasons: [] }
+  for (const job of jobs.slice(0, 500)) {
+    const line = lines.get(job.lineId)
+    const r = line ? await job.run(payeeFromDescription(line.description)) : fail('This line was already handled.')
+    if (r.ok) out.recorded++
+    else {
+      out.failed++
+      if (!out.reasons.includes(r.error)) out.reasons.push(r.error)
+    }
+  }
+  return out
+}
+
 /** Bulk "Confirm suggested": each money-out line becomes an expense with its suggested category. */
 export async function confirmSuggestedAction(
   firmId: string,
   accountId: string,
-  items: { lineId: string; payee: string; categoryId: string }[],
-): Promise<Result<{ confirmed: number; failed: number }>> {
+  items: { lineId: string; categoryId: string }[],
+): Promise<Result<BulkOutcome>> {
   const { db } = await requireFirmRole(firmId, [...MANAGERS])
-  let confirmed = 0
-  let failed = 0
-  for (const it of items.slice(0, 500)) {
-    const parsed = expenseConfirmSchema.safeParse({ payee: it.payee, categoryId: it.categoryId, clientId: '', projectId: '', notes: '' })
-    if (!parsed.success || !UUID.test(it.lineId)) {
-      failed++
-      continue
-    }
-    const r = await confirmExpense(db, it.lineId, parsed.data)
-    if (r.ok) confirmed++
-    else failed++
-  }
+  const out = await recordAll(
+    db,
+    items.map((it) => ({
+      lineId: it.lineId,
+      run: async (payee) => {
+        const parsed = expenseConfirmSchema.safeParse({ payee, categoryId: it.categoryId, clientId: '', projectId: '', notes: '' })
+        return parsed.success ? confirmExpense(db, it.lineId, parsed.data) : fail(parsed.error.issues[0]?.message ?? 'Choose a category.')
+      },
+    })),
+  )
   revalidate(firmId, accountId)
   revalidatePath(`/f/${firmId}/expenses`)
-  return { ok: true, data: { confirmed, failed } }
+  return { ok: true, data: out }
+}
+
+/** Bulk "Categorise": money-out lines become expenses, money-in lines other income, with the chosen categories. */
+export async function bulkCategoriseAction(
+  firmId: string,
+  accountId: string,
+  input: {
+    expenseLineIds: string[]
+    expenseCategoryId: string
+    clientId: string
+    projectId: string
+    incomeLineIds: string[]
+    incomeCategoryId: string
+  },
+): Promise<Result<BulkOutcome>> {
+  const { db } = await requireFirmRole(firmId, [...MANAGERS])
+  const expenseJobs = input.expenseLineIds.map((lineId) => ({
+    lineId,
+    run: async (payee: string): Promise<Result<string>> => {
+      const parsed = expenseConfirmSchema.safeParse({
+        payee,
+        categoryId: input.expenseCategoryId,
+        clientId: input.clientId,
+        projectId: input.projectId,
+        notes: '',
+      })
+      return parsed.success ? confirmExpense(db, lineId, parsed.data) : fail(parsed.error.issues[0]?.message ?? 'Choose a category.')
+    },
+  }))
+  const incomeJobs = input.incomeLineIds.map((lineId) => ({
+    lineId,
+    run: async (source: string): Promise<Result<string>> => {
+      const parsed = otherIncomeConfirmSchema.safeParse({ source, categoryId: input.incomeCategoryId, notes: '' })
+      return parsed.success ? confirmOtherIncome(db, lineId, parsed.data) : fail(parsed.error.issues[0]?.message ?? 'Choose a category.')
+    },
+  }))
+  const out = await recordAll(db, [...expenseJobs, ...incomeJobs])
+  revalidate(firmId, accountId)
+  revalidatePath(`/f/${firmId}/expenses`)
+  revalidatePath(`/f/${firmId}/other-income`)
+  return { ok: true, data: out }
+}
+
+/** Bulk "Mark as duplicate": link to the one matching entry, otherwise ignore as "Duplicate". */
+export async function markDuplicatesAction(
+  firmId: string,
+  accountId: string,
+  lineIds: string[],
+): Promise<Result<{ matched: number; ignored: number; skipped: number }>> {
+  const { db } = await requireFirmRole(firmId, [...MANAGERS])
+  const r = await markDuplicates(db, lineIds.filter((id) => UUID.test(id)).slice(0, 500))
+  revalidate(firmId, accountId)
+  return r
 }
 
 export async function linkLineAction(
@@ -241,4 +322,19 @@ export async function resetLineAction(firmId: string, accountId: string, lineId:
   const r = await resetLine(db, lineId)
   revalidate(firmId, accountId)
   return r
+}
+
+/** Records a payment on an invoice from an imported deposit (Payments section of the invoice page). */
+export async function recordFromDepositAction(
+  firmId: string,
+  invoiceId: string,
+  lineId: string,
+  notes: string,
+): Promise<Result<void>> {
+  const { db } = await requireFirmRole(firmId, [...MANAGERS])
+  if (!UUID.test(lineId) || !UUID.test(invoiceId)) return fail('Bank line not found.')
+  const r = await confirmPayment(db, lineId, invoiceId, notes.trim().slice(0, 1000) || null)
+  revalidatePath(`/f/${firmId}/invoices/${invoiceId}`)
+  revalidatePath(`/f/${firmId}/bank`, 'layout')
+  return r.ok ? { ok: true, data: undefined } : r
 }

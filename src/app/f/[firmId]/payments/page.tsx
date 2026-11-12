@@ -5,7 +5,9 @@ import { isIsoDate, todayIso } from '@/lib/domain/dates'
 import { formatMoney } from '@/lib/domain/money'
 import { listClients } from '@/modules/clients/data'
 import { getFirm } from '@/modules/firms/data'
-import { listAllPayments, type PaymentFilters } from '@/modules/payments/data'
+import { listAllPayments, type BankFilter, type PaymentFilters } from '@/modules/payments/data'
+
+const BANK_FILTERS: BankFilter[] = ['all', 'reconciled', 'unreconciled']
 
 const th = 'py-2 pr-4 font-medium'
 const td = 'py-2 pr-4 align-top'
@@ -58,6 +60,7 @@ export default async function PaymentsPage({
     from: dateParam(sp, 'from', first),
     to: dateParam(sp, 'to', last),
     clientId: client && UUID_RE.test(client) ? client : null,
+    bank: BANK_FILTERS.includes(one(sp, 'bank') as BankFilter) ? (one(sp, 'bank') as BankFilter) : 'all',
   }
   const pageNo = Math.max(1, Math.floor(Number(one(sp, 'page'))) || 1)
   const [list, clients, firm] = await Promise.all([
@@ -72,6 +75,7 @@ export default async function PaymentsPage({
     q.set('from', filters.from ?? '')
     q.set('to', filters.to ?? '')
     if (filters.clientId) q.set('client', filters.clientId)
+    if (filters.bank !== 'all') q.set('bank', filters.bank)
     q.set('page', String(page))
     return `${base}?${q.toString()}`
   }
@@ -82,7 +86,12 @@ export default async function PaymentsPage({
 
   return (
     <div className="max-w-6xl">
-      <h1 className="text-2xl font-semibold">Payments</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Payments</h1>
+        <Link href={`/f/${firmId}/payments/record?from=payments`} className={`${button} bg-primary text-primary-foreground hover:bg-primary/90`}>
+          Record payment
+        </Link>
+      </div>
 
       <form method="get" aria-label="Filter payments" className="mt-4 flex flex-wrap items-end gap-3 text-sm">
         <div className="flex flex-col gap-1">
@@ -103,6 +112,14 @@ export default async function PaymentsPage({
                   {c.name}
                 </option>
               ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="f-bank">Show</label>
+          <select id="f-bank" name="bank" defaultValue={filters.bank} className={select}>
+            <option value="all">All payments</option>
+            <option value="unreconciled">Unreconciled only</option>
+            <option value="reconciled">Reconciled only</option>
           </select>
         </div>
         <button type="submit" className={`${button} border`}>
@@ -126,7 +143,7 @@ export default async function PaymentsPage({
             <table className="mt-4 w-full text-left text-sm">
               <thead>
                 <tr className="border-b">
-                  {['Date', 'Invoice', 'Client', 'Method', 'Reference', 'Files'].map((h) => (
+                  {['Date', 'Invoice', 'Client', 'Method', 'Reference', 'Files', 'Bank'].map((h) => (
                     <th key={h} scope="col" className={th}>
                       {h}
                     </th>
@@ -149,6 +166,13 @@ export default async function PaymentsPage({
                     <td className={td}>{METHOD_LABEL[r.method] ?? r.method}</td>
                     <td className={td}>{r.reference}</td>
                     <td className={td}>{r.fileCount > 0 ? r.fileCount : '—'}</td>
+                    <td className={td}>
+                      {r.bankAccount ? (
+                        <span>Reconciled · {r.bankAccount}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Not reconciled</span>
+                      )}
+                    </td>
                     <td className={`${td} text-right`}>{formatMoney(r.amount, firm.data.currency)}</td>
                   </tr>
                 ))}

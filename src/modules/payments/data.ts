@@ -121,7 +121,9 @@ export async function deletePayment(db: SupabaseClient, firmId: string, paymentI
 
 export const PAYMENT_PAGE_SIZE = 50
 
-export type PaymentFilters = { from: string | null; to: string | null; clientId: string | null }
+export type BankFilter = 'all' | 'reconciled' | 'unreconciled'
+
+export type PaymentFilters = { from: string | null; to: string | null; clientId: string | null; bank: BankFilter }
 
 export type FirmPaymentRow = {
   paymentId: string
@@ -135,6 +137,8 @@ export type FirmPaymentRow = {
   reference: string | null
   amount: string
   fileCount: number
+  /** Name of the bank account whose line is matched to this payment; null when not reconciled. */
+  bankAccount: string | null
 }
 
 type FirmPaymentDb = {
@@ -149,6 +153,7 @@ type FirmPaymentDb = {
   reference: string | null
   amount: string
   file_count: number
+  bank_account: string | null
 }
 
 /** One page of every payment in the firm, plus the total and count for the same filters. */
@@ -159,7 +164,7 @@ export async function listAllPayments(
   page = 1,
 ): Promise<Result<{ rows: FirmPaymentRow[]; total: string; count: number; pages: number }>> {
   const pageNo = Number.isFinite(page) && page >= 1 ? Math.floor(page) : 1
-  const args = { p_firm: firmId, p_from: filters.from, p_to: filters.to, p_client: filters.clientId }
+  const args = { p_firm: firmId, p_from: filters.from, p_to: filters.to, p_client: filters.clientId, p_bank: filters.bank }
   const [totals, list] = await Promise.all([
     db.rpc('payment_totals', args),
     db.rpc('list_payments', { ...args, p_limit: PAYMENT_PAGE_SIZE, p_offset: (pageNo - 1) * PAYMENT_PAGE_SIZE }),
@@ -180,6 +185,7 @@ export async function listAllPayments(
     reference: r.reference,
     amount: r.amount,
     fileCount: r.file_count,
+    bankAccount: r.bank_account,
   }))
   return ok({
     rows,
@@ -187,4 +193,27 @@ export async function listAllPayments(
     count: t.payment_count,
     pages: Math.max(1, Math.ceil(t.payment_count / PAYMENT_PAGE_SIZE)),
   })
+}
+
+export type OpenInvoice = { id: string; number: string; clientName: string; balanceDue: string }
+
+/** Issued and partly paid invoices, for choosing which invoice a payment is for. */
+export async function listOpenInvoices(db: SupabaseClient, firmId: string): Promise<Result<OpenInvoice[]>> {
+  const { data, error } = await db
+    .from('invoices')
+    .select('id, number, total::text, amount_paid::text, clients(name)')
+    .eq('firm_id', firmId)
+    .in('status', ['issued', 'partly_paid'])
+    .order('number')
+    .limit(500)
+  if (error) return fail(mapDbError(error))
+  type Row = { id: string; number: string; total: string; amount_paid: string; clients: { name: string } | null }
+  return ok(
+    ((data ?? []) as unknown as Row[]).map((r) => ({
+      id: r.id,
+      number: r.number,
+      clientName: r.clients?.name ?? '',
+      balanceDue: (Math.round(Number(r.total) * 100 - Number(r.amount_paid) * 100) / 100).toFixed(2),
+    })),
+  )
 }

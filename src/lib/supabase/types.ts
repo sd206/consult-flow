@@ -810,6 +810,11 @@ isOneToOne: false
 "invoice_apply_payments":
 { Args: { "p_invoice": string }; Returns: undefined
                            },
+"invoice_bank_deposits":
+{ Args: { "p_invoice": string }; Returns: {
+              "account_kind": string,"account_name": string,"amount": string,"description": string,"exact_match": boolean,"line_id": string,"posted_on": string
+            }[]
+                           },
 "invoice_candidates":
 { Args: { "p_client": string,"p_end": string,"p_firm": string,"p_start": string }; Returns: {
               "consultant_id": string,"consultant_name": string,"entry_count": number,"hours": string,"project_id": string,"project_name": string,"rate": string
@@ -899,8 +904,13 @@ isOneToOne: false
             }[]
                            },
 "list_payments":
-{ Args: { "p_client": string,"p_firm": string,"p_from": string,"p_limit": number,"p_offset": number,"p_to": string }; Returns: {
-              "amount": string,"client_id": string,"client_name": string,"file_count": number,"invoice_id": string,"invoice_number": string,"invoice_status": string,"method": string,"paid_on": string,"payment_id": string,"reference": string
+{ Args: { "p_bank"?: string,"p_client": string,"p_firm": string,"p_from": string,"p_limit": number,"p_offset": number,"p_to": string }; Returns: {
+              "amount": string,"bank_account": string,"client_id": string,"client_name": string,"file_count": number,"invoice_id": string,"invoice_number": string,"invoice_status": string,"method": string,"paid_on": string,"payment_id": string,"reference": string
+            }[]
+                           },
+"mark_bank_lines_duplicate":
+{ Args: { "p_lines": (string)[] }; Returns: {
+              "ignored": number,"matched": number,"skipped": number
             }[]
                            },
 "my_assignments":
@@ -934,7 +944,7 @@ isOneToOne: false
         isSetofReturn: false
       } },
 "payment_totals":
-{ Args: { "p_client": string,"p_firm": string,"p_from": string,"p_to": string }; Returns: {
+{ Args: { "p_bank"?: string,"p_client": string,"p_firm": string,"p_from": string,"p_to": string }; Returns: {
               "payment_count": number,"total": string
             }[]
                            },
