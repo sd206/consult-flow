@@ -30,7 +30,7 @@ describe('consultant <-> login linking', () => {
     expect((await inviteMember(f.admin.db, adminDb(), f.firmId, { email: u.email, role: 'consultant' }, REDIRECT)).ok).toBe(
       true,
     )
-    const c = await createConsultant(f.manager.db, f.firmId, person(u.email.toUpperCase()))
+    const c = await createConsultant(f.admin.db, f.firmId, person(u.email.toUpperCase()))
     expect(c.ok).toBe(true)
     if (!c.ok) return
     expect(await linkOf(c.data.id)).toBe(u.id)
@@ -39,7 +39,7 @@ describe('consultant <-> login linking', () => {
   it('consultant created first, then invited to log in: linked', async () => {
     const f = await newFirm()
     const u = await newUser('later') // has an account (e.g. in another firm), not a member here
-    const c = await createConsultant(f.manager.db, f.firmId, person(u.email))
+    const c = await createConsultant(f.admin.db, f.firmId, person(u.email))
     expect(c.ok).toBe(true)
     if (!c.ok) return
     expect(await linkOf(c.data.id)).toBeNull()
@@ -53,7 +53,7 @@ describe('consultant <-> login linking', () => {
   it('consultant created first, brand-new email invited: invited and linked', async () => {
     const f = await newFirm()
     const email = `fresh-${crypto.randomUUID()}@test.local`
-    const c = await createConsultant(f.manager.db, f.firmId, person(email))
+    const c = await createConsultant(f.admin.db, f.firmId, person(email))
     expect(c.ok).toBe(true)
     if (!c.ok) return
     const r = await linkOrInviteConsultant(f.admin.db, adminDb(), f.firmId, c.data.id, REDIRECT)
@@ -93,11 +93,11 @@ describe('consultant <-> login linking', () => {
 
   it('updating the email of an unlinked consultant to a member email links it', async () => {
     const f = await newFirm()
-    const c = await createConsultant(f.manager.db, f.firmId, person(`x-${crypto.randomUUID()}@test.local`))
+    const c = await createConsultant(f.admin.db, f.firmId, person(`x-${crypto.randomUUID()}@test.local`))
     expect(c.ok).toBe(true)
     if (!c.ok) return
     expect(await linkOf(c.data.id)).toBeNull()
-    expect((await updateConsultant(f.manager.db, f.firmId, c.data.id, person(f.consultant.email))).ok).toBe(true)
+    expect((await updateConsultant(f.admin.db, f.firmId, c.data.id, person(f.consultant.email))).ok).toBe(true)
     expect(await linkOf(c.data.id)).toBe(f.consultant.id)
   })
 
@@ -116,11 +116,11 @@ describe('consultant <-> login linking', () => {
     expect((await inviteMember(a.admin.db, adminDb(), a.firmId, { email: u.email, role: 'manager' }, REDIRECT)).ok).toBe(
       true,
     )
-    const aRow = await createConsultant(a.manager.db, a.firmId, person(u.email))
+    const aRow = await createConsultant(a.admin.db, a.firmId, person(u.email))
     expect(aRow.ok).toBe(true)
     if (!aRow.ok) return
     expect(await linkOf(aRow.data.id)).toBe(u.id)
-    expect((await updateConsultant(a.manager.db, a.firmId, aRow.data.id, person(u.email))).ok).toBe(true)
+    expect((await updateConsultant(a.admin.db, a.firmId, aRow.data.id, person(u.email))).ok).toBe(true)
 
     // A cannot act on B's record through the link-or-invite path either.
     const cross = await linkOrInviteConsultant(a.admin.db, adminDb(), a.firmId, bRow, REDIRECT)
@@ -135,7 +135,7 @@ describe('consultant <-> login linking', () => {
   it('a member of firm B only is not linked by a firm A consultant record', async () => {
     const a = await newFirm('A')
     const b = await newFirm('B')
-    const c = await createConsultant(a.manager.db, a.firmId, person(b.manager.email))
+    const c = await createConsultant(a.admin.db, a.firmId, person(b.manager.email))
     expect(c.ok).toBe(true)
     if (!c.ok) return
     expect(await linkOf(c.data.id)).toBeNull()

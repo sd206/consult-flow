@@ -4,7 +4,7 @@ import { adminDb, newFirm } from './helpers'
 type Firm = Awaited<ReturnType<typeof newFirm>>
 
 async function mkVendor(f: Firm, name = 'Acme Staffing') {
-  const { data, error } = await f.manager.db
+  const { data, error } = await f.admin.db
     .from('vendors')
     .insert({ firm_id: f.firmId, name })
     .select()
@@ -14,7 +14,7 @@ async function mkVendor(f: Firm, name = 'Acme Staffing') {
 }
 
 async function mkVendorConsultant(f: Firm, vendorId: string) {
-  return f.manager.db
+  return f.admin.db
     .from('consultants')
     .insert({
       firm_id: f.firmId,
@@ -30,13 +30,13 @@ async function mkVendorConsultant(f: Firm, vendorId: string) {
 const text = (e: { message?: string; details?: string } | null) => `${e?.message} ${e?.details}`
 
 describe('people schema', () => {
-  it('manager creates vendor, vendor consultant and a cost rate', async () => {
+  it('admin creates vendor, vendor consultant and a cost rate', async () => {
     const f = await newFirm()
     const vendor = await mkVendor(f)
     const { data: c, error: cErr } = await mkVendorConsultant(f, vendor.id)
     expect(cErr).toBeNull()
     expect(c!.active).toBe(true)
-    const { data: rate, error: rErr } = await f.manager.db
+    const { data: rate, error: rErr } = await f.admin.db
       .from('consultant_cost_rates')
       .insert({
         firm_id: f.firmId,
@@ -52,7 +52,7 @@ describe('people schema', () => {
 
   it('vendor-type consultant requires vendor_id', async () => {
     const f = await newFirm()
-    const { error } = await f.manager.db.from('consultants').insert({
+    const { error } = await f.admin.db.from('consultants').insert({
       firm_id: f.firmId,
       name: 'No Vendor',
       email: `nv-${crypto.randomUUID()}@test.local`,
@@ -65,7 +65,7 @@ describe('people schema', () => {
   it('non-vendor consultant must not carry a vendor_id', async () => {
     const f = await newFirm()
     const vendor = await mkVendor(f)
-    const { error } = await f.manager.db.from('consultants').insert({
+    const { error } = await f.admin.db.from('consultants').insert({
       firm_id: f.firmId,
       name: 'Indy',
       email: `indy-${crypto.randomUUID()}@test.local`,
@@ -92,7 +92,7 @@ describe('people schema', () => {
     const vendor = await mkVendor(f)
     const { error: cErr } = await mkVendorConsultant(f, vendor.id)
     expect(cErr).toBeNull()
-    const { error } = await f.manager.db.from('vendors').delete().eq('id', vendor.id)
+    const { error } = await f.admin.db.from('vendors').delete().eq('id', vendor.id)
     expect(error?.code).toBe('23503')
     expect(text(error)).toContain('consultants_vendor_fk')
     const { data } = await adminDb().from('vendors').select('id').eq('id', vendor.id)
@@ -109,9 +109,9 @@ describe('people schema', () => {
       hourly_cost: 100,
       effective_from: '2026-01-01',
     }
-    const { error: e1 } = await f.manager.db.from('consultant_cost_rates').insert(row)
+    const { error: e1 } = await f.admin.db.from('consultant_cost_rates').insert(row)
     expect(e1).toBeNull()
-    const { error } = await f.manager.db.from('consultant_cost_rates').insert(row)
+    const { error } = await f.admin.db.from('consultant_cost_rates').insert(row)
     expect(error?.code).toBe('23505')
     expect(text(error)).toContain('consultant_cost_rates_consultant_from_key')
     const { data } = await adminDb()
@@ -125,7 +125,7 @@ describe('people schema', () => {
     const f = await newFirm()
     const vendor = await mkVendor(f)
     const { data: c } = await mkVendorConsultant(f, vendor.id)
-    const { error } = await f.manager.db.from('consultant_cost_rates').insert({
+    const { error } = await f.admin.db.from('consultant_cost_rates').insert({
       firm_id: f.firmId,
       consultant_id: c!.id,
       hourly_cost: -1,
@@ -138,7 +138,7 @@ describe('people schema', () => {
     const f = await newFirm()
     const vendor = await mkVendor(f)
     const { data: vc } = await mkVendorConsultant(f, vendor.id)
-    const { data: own, error: ownErr } = await f.manager.db
+    const { data: own, error: ownErr } = await f.admin.db
       .from('consultants')
       .insert({
         firm_id: f.firmId,
@@ -150,7 +150,7 @@ describe('people schema', () => {
       .select()
       .single()
     expect(ownErr).toBeNull()
-    const { error: rateErr } = await f.manager.db.from('consultant_cost_rates').insert({
+    const { error: rateErr } = await f.admin.db.from('consultant_cost_rates').insert({
       firm_id: f.firmId,
       consultant_id: own!.id,
       hourly_cost: 50,
@@ -182,7 +182,7 @@ describe('people schema', () => {
     const b = await newFirm('B')
     const vendor = await mkVendor(a)
     const { data: c } = await mkVendorConsultant(a, vendor.id)
-    const { error: rErr } = await a.manager.db.from('consultant_cost_rates').insert({
+    const { error: rErr } = await a.admin.db.from('consultant_cost_rates').insert({
       firm_id: a.firmId,
       consultant_id: c!.id,
       hourly_cost: 10,
@@ -202,7 +202,7 @@ describe('people schema', () => {
     const f = await newFirm()
     const vendor = await mkVendor(f)
     const { data: c } = await mkVendorConsultant(f, vendor.id)
-    const { data: rate } = await f.manager.db
+    const { data: rate } = await f.admin.db
       .from('consultant_cost_rates')
       .insert({
         firm_id: f.firmId,
@@ -223,7 +223,7 @@ describe('people schema', () => {
     expect(data![0].actor_id).toBe(f.manager.id)
   })
   async function mkEmployee(f: Firm, userId?: string) {
-    return f.manager.db
+    return f.admin.db
       .from('consultants')
       .insert({
         firm_id: f.firmId,
