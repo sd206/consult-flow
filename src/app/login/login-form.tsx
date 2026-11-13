@@ -8,12 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export function LoginForm({ initialError }: { initialError: string | null }) {
+export function LoginForm({ initialError, initialMessage = null }: { initialError: string | null; initialMessage?: string | null }) {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(initialError)
-  const [message, setMessage] = useState<string | null>(null)
+  const [message, setMessage] = useState<string | null>(initialMessage)
   const [busy, setBusy] = useState(false)
 
   async function signIn(e: React.FormEvent) {
@@ -30,6 +30,24 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
     }
     router.push('/')
     router.refresh()
+  }
+
+  async function forgotPassword() {
+    if (!email) {
+      setError('Enter your email first.')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    // The recovery email links to /auth/confirm?type=recovery, which opens /auth/set-password.
+    const { error: err } = await createBrowserDb().auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    })
+    setBusy(false)
+    // Same message whether or not the account exists (no enumeration).
+    if (err) console.error('resetPasswordForEmail failed', err)
+    setMessage('If that email has an account, a password reset link is on its way.')
   }
 
   async function sendLink() {
@@ -96,6 +114,9 @@ export function LoginForm({ initialError }: { initialError: string | null }) {
           </Button>
           <Button type="button" variant="outline" disabled={busy} onClick={sendLink}>
             Email me a link
+          </Button>
+          <Button type="button" variant="link" disabled={busy} onClick={forgotPassword} className="self-center">
+            Forgot password?
           </Button>
         </form>
       </CardContent>

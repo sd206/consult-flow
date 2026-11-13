@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 const MIN_LENGTH = 10
 
-export function SetPasswordForm() {
+export function SetPasswordForm({ change = false }: { change?: boolean }) {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -31,7 +31,11 @@ export function SetPasswordForm() {
     setBusy(false)
     if (err) {
       console.error('updateUser failed', err)
-      setError('We could not set your password. Please try again.')
+      setError(
+        /different from the old/i.test(err.message)
+          ? 'Choose a password different from your current one.'
+          : 'We could not set your password. Please try again.',
+      )
       return
     }
     router.push('/')
@@ -42,7 +46,7 @@ export function SetPasswordForm() {
     <Card className="w-full">
       <CardHeader>
         <CardTitle>
-          <h1>Set your password</h1>
+          <h1>{change ? 'Change your password' : 'Set your password'}</h1>
         </CardTitle>
         <CardDescription>Choose a password of at least {MIN_LENGTH} characters.</CardDescription>
       </CardHeader>
@@ -67,6 +71,11 @@ export function SetPasswordForm() {
           <Button type="submit" disabled={busy}>
             Save password
           </Button>
+          {change && (
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+              Cancel
+            </Button>
+          )}
         </form>
       </CardContent>
     </Card>

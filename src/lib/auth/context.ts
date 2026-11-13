@@ -13,6 +13,7 @@ export type UserContext = {
 
 export type FirmContext = {
   userId: string
+  email: string
   firmId: string
   role: FirmRole
   firmName: string
@@ -38,7 +39,7 @@ export async function requireUser(): Promise<UserContext> {
 }
 
 export async function requireFirmRole(firmId: string, roles: FirmRole[]): Promise<FirmContext> {
-  const { userId, db } = await requireUser()
+  const { userId, email, db } = await requireUser()
   if (!UUID_RE.test(firmId)) notFound()
 
   const { data, error } = await db
@@ -54,5 +55,5 @@ export async function requireFirmRole(firmId: string, roles: FirmRole[]): Promis
   const firm = Array.isArray(data.firms) ? data.firms[0] : data.firms
   if (!firm) notFound()
 
-  return { userId, firmId, role: data.role, firmName: firm.name, db }
+  return { userId, email, firmId, role: data.role, firmName: firm.name, db }
 }
