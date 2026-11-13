@@ -5,7 +5,7 @@ import { LogoForm, SettingsForm } from './settings-forms'
 
 export default async function SettingsPage({ params }: { params: Promise<{ firmId: string }> }) {
   const { firmId } = await params
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   const firm = await getFirm(db, firmId)
 
   return (

@@ -32,10 +32,10 @@ describe('vendors', () => {
     const v = await createVendor(f.admin.db, f.firmId, { name, email: 'a@b.co' })
     expect(v.ok).toBe(true)
     if (!v.ok) return
-    const dup = await createVendor(f.manager.db, f.firmId, { name: name.toUpperCase() })
+    const dup = await createVendor(f.admin.db, f.firmId, { name: name.toUpperCase() })
     expect(dup).toEqual({ ok: false, error: 'That name is already in use.' })
 
-    const upd = await updateVendor(f.manager.db, f.firmId, v.data.id, { name, phone: '555' })
+    const upd = await updateVendor(f.admin.db, f.firmId, v.data.id, { name, phone: '555' })
     expect(upd.ok).toBe(true)
     const list = await listVendors(f.manager.db, f.firmId)
     expect(list.ok && list.data.map((x) => x.name)).toEqual([name])
@@ -82,7 +82,7 @@ describe('consultants', () => {
     const f = await newFirm()
     const v = await createVendor(f.admin.db, f.firmId, { name: `V ${uniq()}` })
     if (!v.ok) throw new Error('vendor')
-    const c = await createConsultant(f.manager.db, f.firmId, {
+    const c = await createConsultant(f.admin.db, f.firmId, {
       name: 'Vee Vendor',
       email: email(),
       type: 'vendor',
@@ -203,14 +203,14 @@ describe('consultants', () => {
       vendorId: null,
     })
     if (!c.ok) throw new Error('c')
-    const upd = await updateConsultant(f.manager.db, f.firmId, c.data.id, {
+    const upd = await updateConsultant(f.admin.db, f.firmId, c.data.id, {
       name: 'Zed',
       email: email(),
       type: 'independent',
       vendorId: null,
     })
     expect(upd.ok).toBe(true)
-    expect((await setConsultantActive(f.manager.db, f.firmId, c.data.id, false)).ok).toBe(true)
+    expect((await setConsultantActive(f.admin.db, f.firmId, c.data.id, false)).ok).toBe(true)
     const active = await listConsultants(f.manager.db, f.firmId)
     expect(active.ok && active.data).toEqual([])
     const all = await listConsultants(f.manager.db, f.firmId, { includeInactive: true })
@@ -287,6 +287,6 @@ describe('cost rates', () => {
       .select('id', { count: 'exact', head: true })
       .eq('id', r.data.id)
     expect(count).toBe(1)
-    expect((await deleteCostRate(f.manager.db, f.firmId, r.data.id)).ok).toBe(true)
+    expect((await deleteCostRate(f.admin.db, f.firmId, r.data.id)).ok).toBe(true)
   })
 })

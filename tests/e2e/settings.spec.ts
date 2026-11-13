@@ -9,10 +9,26 @@ async function login(page: Page, email: string) {
   await expect(page).not.toHaveURL(/\/login/)
 }
 
-test('manager gets 404 on settings', async ({ page }) => {
+test('consultant gets 404 on settings', async ({ page }) => {
   const f = await newFirm('Settings Gate')
-  await login(page, f.manager.email)
+  await login(page, f.consultant.email)
   expect((await page.goto(`/f/${f.firmId}/settings`))?.status()).toBe(404)
+})
+
+test('manager edits settings and uploads a logo', async ({ page }) => {
+  const f = await newFirm('Settings Manager Firm')
+  await login(page, f.manager.email)
+  await page.goto(`/f/${f.firmId}/settings`)
+  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
+  await page.getByLabel('Invoice number pattern').fill('MGR-{YYYY}-{SEQ:4}')
+  await page.getByRole('button', { name: 'Save settings' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Settings saved' })).toBeVisible()
+  await page.getByLabel(/Logo file/).setInputFiles('tests/e2e/fixtures/logo.png')
+  await page.getByRole('button', { name: 'Upload logo' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Logo updated' })).toBeVisible()
+  const { data } = await adminDb().from('firms').select('invoice_number_pattern, logo_path').eq('id', f.firmId).single()
+  expect(data?.invoice_number_pattern).toBe('MGR-{YYYY}-{SEQ:4}')
+  expect(data?.logo_path).toBeTruthy()
 })
 
 test('admin edits settings, sees inline pattern error, uploads a logo', async ({ page }) => {

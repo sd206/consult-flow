@@ -26,7 +26,7 @@ async function mkProject(f: Firm, clientId: string, name = 'Rollout', code: stri
 }
 
 async function mkConsultant(f: Firm, userId?: string, name = 'Con Sultant') {
-  const { data, error } = await f.manager.db
+  const { data, error } = await f.admin.db
     .from('consultants')
     .insert({
       firm_id: f.firmId,

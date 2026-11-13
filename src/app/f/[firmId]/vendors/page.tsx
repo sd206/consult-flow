@@ -4,7 +4,8 @@ import { DeleteVendorForm, VendorForm } from './vendor-forms'
 
 export default async function VendorsPage({ params }: { params: Promise<{ firmId: string }> }) {
   const { firmId } = await params
-  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
+  const { db, role } = await requireFirmRole(firmId, ['admin', 'manager'])
+  const canEdit = role === 'admin'
   const vendors = await listVendors(db, firmId)
 
   return (
@@ -28,9 +29,11 @@ export default async function VendorsPage({ params }: { params: Promise<{ firmId
               <th scope="col" className="py-2 pr-4 font-medium">
                 Contact
               </th>
-              <th scope="col" className="py-2 font-medium">
-                Actions
-              </th>
+              {canEdit && (
+                <th scope="col" className="py-2 font-medium">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -40,6 +43,7 @@ export default async function VendorsPage({ params }: { params: Promise<{ firmId
                   {v.name}
                 </th>
                 <td className="py-2 pr-4">{[v.contactName, v.email, v.phone].filter(Boolean).join(' · ')}</td>
+                {canEdit && (
                 <td className="py-2">
                   <div className="flex flex-col gap-2">
                     <DeleteVendorForm firmId={firmId} vendor={v} />
@@ -51,14 +55,21 @@ export default async function VendorsPage({ params }: { params: Promise<{ firmId
                     </details>
                   </div>
                 </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      <h2 className="mt-8 text-lg font-medium">Add a vendor</h2>
-      <VendorForm firmId={firmId} />
+      {canEdit ? (
+        <>
+          <h2 className="mt-8 text-lg font-medium">Add a vendor</h2>
+          <VendorForm firmId={firmId} />
+        </>
+      ) : (
+        <p className="mt-6 text-sm text-muted-foreground">Only Admins can add or change vendors.</p>
+      )}
     </div>
   )
 }

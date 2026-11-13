@@ -28,7 +28,7 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
 
   const [summary, firm] = await Promise.all([getDashboardSummary(db, firmId, role), getFirm(db, firmId)])
   const currency = firm.ok ? firm.data.currency : 'USD'
-  const isAdmin = role === 'admin'
+  const canEditSettings = role === 'admin' || role === 'manager'
 
   return (
     <div className="max-w-3xl">
@@ -95,7 +95,7 @@ export default async function FirmDashboard({ params }: { params: Promise<{ firm
           <h2 className="mt-8 text-lg font-medium">Finish setup</h2>
           <ul className="mt-2 space-y-2 text-sm">
             {[
-              { label: 'Add your firm logo', done: summary.data.hasLogo, href: isAdmin ? `/f/${firmId}/settings` : null },
+              { label: 'Add your firm logo', done: summary.data.hasLogo, href: canEditSettings ? `/f/${firmId}/settings` : null },
               { label: 'Add a client', done: summary.data.clients > 0, href: `/f/${firmId}/clients` },
               { label: 'Add a project', done: summary.data.projects > 0, href: `/f/${firmId}/projects` },
               { label: 'Assign a consultant to a project', done: summary.data.assignments > 0, href: `/f/${firmId}/projects` },

@@ -15,7 +15,7 @@ export default async function TemplatesPage({
 }) {
   const { firmId } = await params
   const { edit, new: isNew } = await searchParams
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   const list = await listTemplates(db, firmId)
 
   let editing: TemplateRow | null = null

@@ -70,12 +70,20 @@ describe('updateFirmSettings', () => {
     expect(data).toEqual({ name: 'Keep Name', invoice_number_pattern: 'INV-{YYYY}-{SEQ:4}' })
   })
 
-  it('manager is denied (0 rows updated)', async () => {
+  it('manager can update settings too', async () => {
     const f = await newFirm('Manager Target')
-    const r = await updateFirmSettings(f.manager.db, f.firmId, settings())
+    const r = await updateFirmSettings(f.manager.db, f.firmId, { ...settings(), name: 'Renamed by manager' })
+    expect(r.ok).toBe(true)
+    const { data } = await adminDb().from('firms').select('name').eq('id', f.firmId).single()
+    expect(data?.name).toBe('Renamed by manager')
+  })
+
+  it('consultant is denied (0 rows updated)', async () => {
+    const f = await newFirm('Consultant Target')
+    const r = await updateFirmSettings(f.consultant.db, f.firmId, settings())
     expect(r).toEqual({ ok: false, error: DENIED })
     const { data } = await adminDb().from('firms').select('name').eq('id', f.firmId).single()
-    expect(data?.name).toBe('Manager Target')
+    expect(data?.name).toBe('Consultant Target')
   })
 
   it('admin cannot update invoice_next_seq via PostgREST', async () => {
@@ -151,9 +159,16 @@ describe('uploadFirmLogo', () => {
     expect(await logoObjects(f.firmId)).toEqual([])
   })
 
-  it('manager cannot upload a logo', async () => {
+  it('manager can upload a logo', async () => {
     const f = await newFirm()
     const r = await uploadFirmLogo(f.manager.db, f.firmId, file('x.png', 'image/png', buf(PNG_BYTES)))
+    expect(r.ok).toBe(true)
+    expect(await logoObjects(f.firmId)).toHaveLength(1)
+  })
+
+  it('consultant cannot upload a logo', async () => {
+    const f = await newFirm()
+    const r = await uploadFirmLogo(f.consultant.db, f.firmId, file('x.png', 'image/png', buf(PNG_BYTES)))
     expect(r.ok).toBe(false)
     expect(await logoObjects(f.firmId)).toEqual([])
   })

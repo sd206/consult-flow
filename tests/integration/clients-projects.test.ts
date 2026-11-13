@@ -26,7 +26,7 @@ async function setup(f: Firm) {
     status: 'active',
   })
   if (!project.ok) throw new Error(project.error)
-  const consultant = await createConsultant(f.manager.db, f.firmId, {
+  const consultant = await createConsultant(f.admin.db, f.firmId, {
     name: 'Cons',
     email: `c-${crypto.randomUUID()}@test.local`,
     type: 'employee',

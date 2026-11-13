@@ -54,12 +54,12 @@ describe('firm-files storage', () => {
     expect((await f.admin.db.storage.from(BUCKET).download(path)).error).toBeNull()
   })
 
-  it('manager cannot write logo path, but can write elsewhere in firm', async () => {
+  it('manager can write the logo path and elsewhere in firm', async () => {
     const f = await newFirm()
     const logo = `firms/${f.firmId}/logo/m.png`
     const up = await f.manager.db.storage.from(BUCKET).upload(logo, png())
-    expect(up.error).not.toBeNull()
-    expect(await exists(logo)).toBe(false)
+    expect(up.error).toBeNull()
+    expect(await exists(logo)).toBe(true)
     const other = `firms/${f.firmId}/attachments/payments/${crypto.randomUUID()}/incoming-${crypto.randomUUID()}`
     const ok = await f.manager.db.storage.from(BUCKET).upload(other, png())
     expect(ok.error).toBeNull()
@@ -98,14 +98,14 @@ describe('firm-files storage', () => {
     expect(await exists(path)).toBe(true)
   })
 
-  it('admin can overwrite and delete own logo; manager cannot delete it', async () => {
+  it('admin and manager can overwrite and delete the logo; consultant cannot delete it', async () => {
     const f = await newFirm()
     const path = `firms/${f.firmId}/logo/z.png`
     expect((await f.admin.db.storage.from(BUCKET).upload(path, png())).error).toBeNull()
-    expect((await f.admin.db.storage.from(BUCKET).upload(path, png(), { upsert: true })).error).toBeNull()
-    await f.manager.db.storage.from(BUCKET).remove([path])
+    expect((await f.manager.db.storage.from(BUCKET).upload(path, png(), { upsert: true })).error).toBeNull()
+    await f.consultant.db.storage.from(BUCKET).remove([path])
     expect(await exists(path)).toBe(true)
-    const rm = await f.admin.db.storage.from(BUCKET).remove([path])
+    const rm = await f.manager.db.storage.from(BUCKET).remove([path])
     expect(rm.error).toBeNull()
     expect(await exists(path)).toBe(false)
   })

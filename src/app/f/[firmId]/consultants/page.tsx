@@ -15,7 +15,7 @@ export default async function ConsultantsPage({
 }) {
   const { firmId } = await params
   const includeInactive = (await searchParams).inactive === '1'
-  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
+  const { db } = await requireFirmRole(firmId, ['admin'])
   const [consultants, vendors, firm] = await Promise.all([
     listConsultants(db, firmId, { includeInactive }),
     listVendors(db, firmId),

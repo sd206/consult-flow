@@ -83,3 +83,47 @@ test('confirm links with a bad token or type go to the login error', async ({ pa
   }
   await expect(page.getByText('That sign-in link is invalid or has expired.')).toBeVisible()
 })
+
+test('adding an existing user emails them a sign-in link', async ({ page }) => {
+  const f = await newFirm('Added Existing Firm')
+  const other = await newFirm('Added Existing Other')
+  await login(page, f.admin.email)
+  await page.goto(`/f/${f.firmId}/users`)
+  await page.getByLabel('Email', { exact: true }).fill(other.manager.email)
+  await page.getByLabel('Role', { exact: true }).selectOption('manager')
+  await page.getByRole('button', { name: 'Invite' }).click()
+  await expect(page.getByRole('status')).toHaveText('Existing user added to this firm. We emailed them a sign-in link.')
+  const link = await emailLink(other.manager.email)
+  expect(link).toMatch(/\/auth\/confirm\?token_hash=[^&]+&type=magiclink$/)
+})
+
+test('an invitation that was never accepted can be sent again', async ({ page }) => {
+  const f = await newFirm('Resend Invite Firm')
+  await login(page, f.admin.email)
+  await page.goto(`/f/${f.firmId}/users`)
+  const email = `resend-${crypto.randomUUID()}@test.local`
+  await page.getByLabel('Email', { exact: true }).fill(email)
+  await page.getByLabel('Role', { exact: true }).selectOption('manager')
+  await page.getByRole('button', { name: 'Invite' }).click()
+  await expect(page.getByRole('status')).toHaveText('Invitation sent.')
+  await emailLink(email)
+
+  await page.reload()
+  const row = page.getByRole('row').filter({ hasText: email })
+  await expect(row).toContainText('Invitation not accepted yet')
+  await row.getByRole('button', { name: /^Resend invitation/ }).click()
+  await expect(row.getByRole('status')).toHaveText('Invitation sent again.')
+  await expect
+    .poll(async () => {
+      const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`)
+      return ((await res.json()) as MailpitList).messages.length
+    })
+    .toBe(2)
+
+  // Accepting the resent invitation works.
+  await page.context().clearCookies()
+  const link = await emailLink(email)
+  expect(link).toMatch(/type=invite$/)
+  await page.goto(link)
+  await expect(page).toHaveURL(/\/auth\/set-password$/)
+})

@@ -20,7 +20,7 @@ export async function updateFirmSettingsAction(
   firmId: string,
   formData: FormData,
 ): Promise<SettingsResult> {
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   const parsed = firmSettingsSchema.safeParse({
     name: str(formData, 'name'),
     address: str(formData, 'address'),
@@ -49,7 +49,7 @@ export async function uploadFirmLogoAction(
   firmId: string,
   formData: FormData,
 ): Promise<Result<{ logoPath: string }>> {
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   const LOGO_ERROR = 'Logo must be a PNG or JPEG under 2 MB.'
   const file = formData.get('logo')
   if (!(file instanceof File) || file.size === 0) return fail('Choose a logo file to upload.')

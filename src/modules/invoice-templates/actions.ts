@@ -36,25 +36,25 @@ function done<T>(firmId: string, result: FormResult<T>): FormResult<T> {
 }
 
 export async function createTemplateAction(firmId: string, formData: FormData): Promise<FormResult<{ id: string }>> {
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   const parsed = parseTemplate(formData)
   if (!parsed.success) return templateFieldErrors(parsed.error)
   return done(firmId, await createTemplate(db, firmId, parsed.data))
 }
 
 export async function updateTemplateAction(firmId: string, id: string, formData: FormData): Promise<FormResult> {
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   const parsed = parseTemplate(formData)
   if (!parsed.success) return templateFieldErrors(parsed.error)
   return done(firmId, await updateTemplate(db, firmId, id, parsed.data))
 }
 
 export async function deleteTemplateAction(firmId: string, id: string): Promise<FormResult> {
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   return done(firmId, await deleteTemplate(db, firmId, id))
 }
 
 export async function setDefaultTemplateAction(firmId: string, id: string): Promise<FormResult> {
-  const { db } = await requireFirmRole(firmId, ['admin'])
+  const { db } = await requireFirmRole(firmId, ['admin', 'manager'])
   return done(firmId, await setDefaultTemplate(db, firmId, id))
 }
