@@ -73,7 +73,7 @@ describe('invoice templates', () => {
     standardId = rows[0].id
   })
 
-  it('admin manages templates; manager reads only', async () => {
+  it('admins and managers manage templates; consultants cannot', async () => {
     const { data, error } = await f.admin.db
       .from('invoice_templates')
       .insert({ firm_id: f.firmId, name: 'Modern', base_layout: 'modern' })
@@ -82,10 +82,10 @@ describe('invoice templates', () => {
     expect(error).toBeNull()
     modernId = (data as { id: string }).id
 
-    const { error: mErr } = await f.manager.db
+    const { error: cErr } = await f.consultant.db
       .from('invoice_templates')
       .insert({ firm_id: f.firmId, name: 'Sneaky' })
-    expect(text(mErr)).toMatch(/row-level security/)
+    expect(text(cErr)).toMatch(/row-level security/)
 
     const { data: mRows } = await f.manager.db.from('invoice_templates').select('id').eq('firm_id', f.firmId)
     expect(mRows).toHaveLength(2)
@@ -100,8 +100,8 @@ describe('invoice templates', () => {
     expect(rows.find((r) => r.id === modernId)?.is_default).toBe(true)
     expect(rows.find((r) => r.id === standardId)?.is_default).toBe(false)
 
-    const { error: mErr } = await f.manager.db.rpc('set_default_template', { p_template: standardId })
-    expect(mErr?.code).toBe('42501')
+    const { error: cErr } = await f.consultant.db.rpc('set_default_template', { p_template: standardId })
+    expect(cErr?.code).toBe('42501')
   })
 
   it("default template can't be deleted", async () => {
