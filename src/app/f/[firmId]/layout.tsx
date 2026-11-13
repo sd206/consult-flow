@@ -1,4 +1,5 @@
 import { requireFirmRole } from '@/lib/auth/context'
+import { AccountMenu } from '@/components/account-menu'
 import type { FirmRole } from '@/lib/db-types'
 import { FirmNav, type NavEntry } from './firm-nav'
 
@@ -74,15 +75,15 @@ export default async function FirmLayout({
   params: Promise<{ firmId: string }>
 }) {
   const { firmId } = await params
-  const { role, firmName } = await requireFirmRole(firmId, ALL)
+  const { role, firmName, email } = await requireFirmRole(firmId, ALL)
   const base = `/f/${firmId}`
 
   return (
     <div className="min-h-screen">
       <header className="bg-brand px-6 py-3 text-brand-foreground">
-        <div className="flex items-baseline justify-between">
+        <div className="flex items-center justify-between">
           <span className="font-semibold">{firmName}</span>
-          <span className="text-sm text-white/75">{role}</span>
+          <AccountMenu email={email} role={role} />
         </div>
         <FirmNav entries={navFor(role, base)} home={base} />
       </header>

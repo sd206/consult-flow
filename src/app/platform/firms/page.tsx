@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireUser } from '@/lib/auth/context'
+import { AccountMenu } from '@/components/account-menu'
 import { CreateFirmForm } from './create-firm-form'
 
 const PAGE_SIZE = 50
@@ -12,7 +13,7 @@ export default async function PlatformFirmsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { isPlatformOwner, db } = await requireUser()
+  const { isPlatformOwner, db, email } = await requireUser()
   if (!isPlatformOwner) notFound()
   const sp = await searchParams
   const q = typeof sp.q === 'string' ? sp.q.trim().slice(0, 100) : ''
@@ -37,7 +38,11 @@ export default async function PlatformFirmsPage({
 
   return (
     <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">Firms</h1>
+      <div className="flex items-center justify-between rounded-lg bg-brand px-4 py-2 text-brand-foreground">
+        <span className="font-semibold">Platform</span>
+        <AccountMenu email={email} />
+      </div>
+      <h1 className="mt-6 text-2xl font-semibold">Firms</h1>
 
       <form method="get" aria-label="Search firms" className="mt-4 flex flex-wrap items-end gap-3 text-sm">
         <div className="flex flex-col gap-1">
