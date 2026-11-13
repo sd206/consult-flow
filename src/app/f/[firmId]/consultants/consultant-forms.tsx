@@ -211,7 +211,7 @@ export function InviteForm({
   consultantId: string
   hasLogin: boolean
 }) {
-  const [state, action, pending] = useActionState<FormResult<{ outcome: LoginOutcome }> | null, FormData>(
+  const [state, action, pending] = useActionState<FormResult<{ outcome: LoginOutcome; emailed?: boolean }> | null, FormData>(
     async () => inviteConsultantAction(firmId, consultantId),
     null,
   )
@@ -223,7 +223,18 @@ export function InviteForm({
           {pending ? 'Inviting…' : 'Invite to log in'}
         </Button>
       )}
-      <FormMessages state={state} success={state?.ok ? OUTCOME_MESSAGE[state.data.outcome] : ''} />
+      <FormMessages
+        state={state}
+        success={
+          state?.ok
+            ? state.data.outcome === 'added'
+              ? state.data.emailed
+                ? 'Existing user added to this firm. We emailed them a sign-in link.'
+                : 'Existing user added to this firm, but the sign-in email could not be sent.'
+              : OUTCOME_MESSAGE[state.data.outcome]
+            : ''
+        }
+      />
     </form>
   )
 }

@@ -1,11 +1,14 @@
 import { requireFirmRole } from '@/lib/auth/context'
 import { listMembers } from '@/modules/members/data'
-import { InviteForm, RemoveForm, RoleForm } from './member-controls'
+import { InviteForm, RemoveForm, ResendForm, RoleForm } from './member-controls'
 
 export default async function UsersPage({ params }: { params: Promise<{ firmId: string }> }) {
   const { firmId } = await params
   const { db, userId } = await requireFirmRole(firmId, ['admin'])
-  const members = await listMembers(db, firmId)
+  const [members, logins] = await Promise.all([listMembers(db, firmId), db.rpc('firm_member_logins', { p_firm: firmId })])
+  const login = new Map(
+    ((logins.data ?? []) as { user_id: string; invite_pending: boolean; signed_in: boolean }[]).map((l) => [l.user_id, l]),
+  )
 
   return (
     <div className="max-w-3xl">
@@ -24,6 +27,9 @@ export default async function UsersPage({ params }: { params: Promise<{ firmId: 
                 Member
               </th>
               <th scope="col" className="py-2 pr-4 font-medium">
+                Sign-in
+              </th>
+              <th scope="col" className="py-2 pr-4 font-medium">
                 Role
               </th>
               <th scope="col" className="py-2 font-medium">
@@ -37,13 +43,30 @@ export default async function UsersPage({ params }: { params: Promise<{ firmId: 
                 <td className="py-2 pr-4">
                   {m.displayName ? `${m.displayName} (${m.email})` : m.email}
                 </td>
+                <td className="py-2 pr-4 text-muted-foreground">
+                  {login.get(m.userId)?.invite_pending
+                    ? 'Invitation not accepted yet'
+                    : login.get(m.userId) && !login.get(m.userId)?.signed_in
+                      ? "Hasn't signed in yet"
+                      : login.get(m.userId)
+                        ? 'Active'
+                        : ''}
+                </td>
                 <td className="py-2 pr-4">
                   <RoleForm firmId={firmId} userId={m.userId} email={m.email} role={m.role} />
                 </td>
                 <td className="py-2">
-                  {m.userId !== userId && (
-                    <RemoveForm firmId={firmId} userId={m.userId} email={m.email} />
-                  )}
+                  <div className="flex flex-col gap-2">
+                    {login.get(m.userId) && !login.get(m.userId)?.signed_in && (
+                      <ResendForm
+                        firmId={firmId}
+                        userId={m.userId}
+                        email={m.email}
+                        pending={!!login.get(m.userId)?.invite_pending}
+                      />
+                    )}
+                    {m.userId !== userId && <RemoveForm firmId={firmId} userId={m.userId} email={m.email} />}
+                  </div>
                 </td>
               </tr>
             ))}

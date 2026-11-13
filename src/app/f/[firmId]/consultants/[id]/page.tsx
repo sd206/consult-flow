@@ -11,7 +11,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export default async function ConsultantPage({ params }: { params: Promise<{ firmId: string; id: string }> }) {
   const { firmId, id } = await params
-  const { db, role } = await requireFirmRole(firmId, ['admin', 'manager'])
+  const { db, role } = await requireFirmRole(firmId, ['admin'])
   if (!UUID_RE.test(id)) notFound()
 
   const [consultant, vendors, firm] = await Promise.all([

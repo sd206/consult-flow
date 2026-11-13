@@ -220,7 +220,7 @@ describe('people schema', () => {
       .eq('action', 'insert')
     expect(data).toHaveLength(1)
     expect(data![0].entity_id).toBe(rate!.id)
-    expect(data![0].actor_id).toBe(f.manager.id)
+    expect(data![0].actor_id).toBe(f.admin.id)
   })
   async function mkEmployee(f: Firm, userId?: string) {
     return f.admin.db
@@ -240,7 +240,7 @@ describe('people schema', () => {
     const a = await newFirm('A')
     const b = await newFirm('B')
     const { data: c } = await mkEmployee(a)
-    const { error } = await a.manager.db
+    const { error } = await a.admin.db
       .from('consultants')
       .update({ user_id: b.consultant.id })
       .eq('id', c!.id)

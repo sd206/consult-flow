@@ -793,6 +793,11 @@ isOneToOne: false
               "expense_count": number,"total": string
             }[]
                            },
+"firm_member_logins":
+{ Args: { "p_firm": string }; Returns: {
+              "invite_pending": boolean,"signed_in": boolean,"user_id": string
+            }[]
+                           },
 "format_invoice_number":
 { Args: { "p_issue": string,"p_pattern": string,"p_seq": number }; Returns: string
                            },

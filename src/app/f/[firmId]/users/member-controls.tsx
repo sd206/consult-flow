@@ -10,6 +10,7 @@ import {
   changeMemberRoleAction,
   inviteMemberAction,
   removeMemberAction,
+  resendSignInAction,
 } from '@/modules/members/actions'
 
 const ROLES: FirmRole[] = ['admin', 'manager', 'consultant']
@@ -26,7 +27,7 @@ function ErrorLine({ state }: { state: Result<unknown> | null }) {
 
 export function InviteForm({ firmId }: { firmId: string }) {
   const [state, action, pending] = useActionState<
-    Result<{ userId: string; invited: boolean }> | null,
+    Result<{ userId: string; invited: boolean; emailed: boolean }> | null,
     FormData
   >(async (_prev, fd) => inviteMemberAction(firmId, fd), null)
 
@@ -49,7 +50,11 @@ export function InviteForm({ firmId }: { firmId: string }) {
       <ErrorLine state={state} />
       {state?.ok && (
         <p role="status" className="text-sm">
-          {state.data.invited ? 'Invitation sent.' : 'Existing user added to this firm.'}
+          {state.data.invited
+            ? 'Invitation sent.'
+            : state.data.emailed
+              ? 'Existing user added to this firm. We emailed them a sign-in link.'
+              : 'Existing user added to this firm, but the sign-in email could not be sent. They can use "Email me a link" on the sign-in page.'}
         </p>
       )}
       <Button type="submit" disabled={pending} className="self-start">
@@ -117,6 +122,29 @@ export function RemoveForm({
         Remove<span className="sr-only"> {email}</span>
       </Button>
       <ErrorLine state={state} />
+    </form>
+  )
+}
+
+/** For members who haven't signed in yet: re-sends the invitation, or a sign-in link if they accepted it. */
+export function ResendForm({ firmId, userId, email, pending }: { firmId: string; userId: string; email: string; pending: boolean }) {
+  const [state, action, busy] = useActionState<Result<{ sent: 'invite' | 'magiclink' }> | null, FormData>(
+    async (_prev, fd) => resendSignInAction(firmId, fd),
+    null,
+  )
+  return (
+    <form action={action} className="flex flex-col gap-1">
+      <input type="hidden" name="userId" value={userId} />
+      <Button type="submit" variant="outline" size="sm" disabled={busy} className="self-start">
+        {busy ? 'Sending…' : pending ? 'Resend invitation' : 'Email sign-in link'}
+        <span className="sr-only"> to {email}</span>
+      </Button>
+      <ErrorLine state={state} />
+      {state?.ok && (
+        <p role="status" className="text-xs">
+          {state.data.sent === 'invite' ? 'Invitation sent again.' : 'Sign-in link sent.'}
+        </p>
+      )}
     </form>
   )
 }

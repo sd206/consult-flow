@@ -128,16 +128,7 @@ test.describe('foundation flow', () => {
     await page.getByRole('button', { name: 'Upload logo' }).click()
     await expect(page.getByRole('status').filter({ hasText: 'Logo updated' })).toBeVisible()
 
-    await page.goto(`/f/${firmId}/users`)
-    await page.getByLabel('Email', { exact: true }).fill(managerEmail)
-    await page.getByLabel('Role', { exact: true }).selectOption('manager')
-    await page.getByRole('button', { name: 'Invite' }).click()
-    await expect(page.getByRole('status')).toContainText('Existing user added to this firm')
-    await expect(page.getByRole('cell', { name: managerEmail, exact: true })).toBeVisible()
-    await page.context().clearCookies()
-
-    // Manager sets up vendor, consultant, client, project, assignment.
-    await login(page, managerEmail)
+    // Admin sets up the vendor and consultant (admin-only).
     await page.goto(`/f/${firmId}/vendors`)
     await page.getByLabel('Vendor name').last().fill(vendorName)
     await page.getByRole('button', { name: 'Add vendor' }).click()
@@ -155,6 +146,16 @@ test.describe('foundation flow', () => {
     await expect(page.getByRole('status')).toContainText('Consultant added')
     await expect(page.getByRole('cell', { name: '$90.00' })).toBeVisible()
 
+    await page.goto(`/f/${firmId}/users`)
+    await page.getByLabel('Email', { exact: true }).fill(managerEmail)
+    await page.getByLabel('Role', { exact: true }).selectOption('manager')
+    await page.getByRole('button', { name: 'Invite' }).click()
+    await expect(page.getByRole('status')).toContainText('Existing user added to this firm. We emailed them a sign-in link.')
+    await expect(page.getByRole('cell', { name: managerEmail, exact: true })).toBeVisible()
+    await page.context().clearCookies()
+
+    // Manager sets up client, project and assignment.
+    await login(page, managerEmail)
     await page.goto(`/f/${firmId}/clients`)
     await page.getByLabel('Client name').last().fill(clientName)
     await page.getByRole('button', { name: 'Add client' }).click()

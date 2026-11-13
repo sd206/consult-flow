@@ -16,9 +16,9 @@ test('consultant role gets 404 on vendors and consultants pages', async ({ page 
   expect((await page.goto(`/f/${f.firmId}/consultants`))?.status()).toBe(404)
 })
 
-test('manager adds a vendor and a vendor consultant with a cost rate', async ({ page }) => {
+test('admin adds a vendor and a vendor consultant with a cost rate', async ({ page }) => {
   const f = await newFirm('People Firm')
-  await login(page, f.manager.email)
+  await login(page, f.admin.email)
 
   await page.goto(`/f/${f.firmId}/vendors`)
   await expect(page.getByRole('heading', { name: 'Vendors' })).toBeVisible()
@@ -53,8 +53,8 @@ test('manager adds a vendor and a vendor consultant with a cost rate', async ({ 
   await page.getByRole('button', { name: 'Add cost rate' }).click()
   await expect(page.getByRole('status').last()).toContainText('Cost rate added')
   await expect(page.getByRole('cell', { name: '$105.50' })).toBeVisible()
-  // Managers cannot invite (admin only).
-  await expect(page.getByRole('button', { name: 'Invite to log in' })).toHaveCount(0)
+  // The consultant has no login yet, so the admin can invite them.
+  await expect(page.getByRole('button', { name: 'Invite to log in' })).toBeVisible()
 })
 
 test('admin "Invite to log in" links a consultant record to an existing member', async ({ page }) => {
@@ -72,4 +72,18 @@ test('admin "Invite to log in" links a consultant record to an existing member',
   await expect(page.getByText('That person is already a member of this firm.')).toHaveCount(0)
   const { data } = await adminDb().from('consultants').select('user_id').eq('id', row!.id).single()
   expect(data?.user_id).toBe(f.manager.id)
+})
+
+test('managers cannot open consultants and see vendors read-only', async ({ page }) => {
+  const f = await newFirm('Manager People Firm')
+  await adminDb().from('vendors').insert({ firm_id: f.firmId, name: 'Acme Staffing' })
+  await login(page, f.manager.email)
+  expect((await page.goto(`/f/${f.firmId}/consultants`))?.status()).toBe(404)
+  await page.goto(`/f/${f.firmId}`)
+  await page.getByRole('navigation', { name: 'Firm' }).getByRole('button', { name: 'Setup' }).click()
+  await expect(page.getByRole('navigation', { name: 'Firm' }).getByRole('link', { name: 'Consultants' })).toHaveCount(0)
+  await page.goto(`/f/${f.firmId}/vendors`)
+  await expect(page.getByRole('rowheader', { name: 'Acme Staffing' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Add vendor' })).toHaveCount(0)
+  await expect(page.getByText('Only Admins can add or change vendors.')).toBeVisible()
 })
