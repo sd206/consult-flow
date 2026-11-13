@@ -72,13 +72,12 @@ test.describe('dashboard', () => {
     await expect(page.getByText('Not done').first()).toBeVisible()
   })
 
-  test('manager sees the finish-setup checklist without a settings link', async ({ page }) => {
+  test('manager sees the finish-setup checklist with a settings link', async ({ page }) => {
     const f = await newFirm('Dash Manager Firm')
     await login(page, f.manager.email)
     await page.goto(`/f/${f.firmId}`)
     await expect(page.getByRole('heading', { name: 'Finish setup' })).toBeVisible()
-    await expect(page.getByText('Add your firm logo')).toBeVisible()
-    await expect(page.locator(`a[href="/f/${f.firmId}/settings"]`)).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Add your firm logo' })).toHaveAttribute('href', `/f/${f.firmId}/settings`)
   })
 })
 

@@ -74,9 +74,10 @@ describe('invoice templates data', () => {
     expect((await getTemplate(f.admin.db, f.firmId, id)).ok).toBe(false)
   })
 
-  it('a manager can read but not create', async () => {
+  it('a manager can read and create; a consultant cannot create', async () => {
     expect(must(await listTemplates(f.manager.db, f.firmId)).length).toBeGreaterThan(0)
-    const r = await createTemplate(f.manager.db, f.firmId, input('Nope'))
+    expect((await createTemplate(f.manager.db, f.firmId, input('By manager'))).ok).toBe(true)
+    const r = await createTemplate(f.consultant.db, f.firmId, input('Nope'))
     expect(r).toEqual({ ok: false, error: "You don't have permission to do that." })
   })
 })

@@ -59,8 +59,11 @@ test('bad accent colour shows a field error', async ({ page }) => {
   await expect(page.getByText('Use a colour like #1F2937.')).toBeVisible()
 })
 
-test('manager gets 404 on template settings', async ({ page }) => {
+test('consultant gets 404 on template settings; manager can open them', async ({ page }) => {
   const f = await newFirm('Template Gate')
-  await login(page, f.manager.email)
+  await login(page, f.consultant.email)
   expect((await page.goto(`/f/${f.firmId}/settings/templates`))?.status()).toBe(404)
+  await page.context().clearCookies()
+  await login(page, f.manager.email)
+  expect((await page.goto(`/f/${f.firmId}/settings/templates`))?.status()).toBe(200)
 })
